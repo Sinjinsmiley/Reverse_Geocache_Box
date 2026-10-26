@@ -171,12 +171,9 @@ void setup()
     check_developer_lock(lcd);
 
     // ------------------------------------------------------------
-    // wait until we get a steady satellite lock:
-    wait_for_gps(lcd);
-
-    // ------------------------------------------------------------
     // update the display with the clue for the target, the
-    // distance to it, and whether it is hotter or colder
+    // distance to it, and whether it is hotter or colder, or
+    // show the clock if the hunt is over
     update_target_display(lcd);
 
 #endif

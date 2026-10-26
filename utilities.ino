@@ -45,6 +45,78 @@ void init_gps() {
 
 
 // ----------------------------------------------------------------------
+// give up waiting for the gps: say why, then turn off. Never returns.
+// 
+void gps_give_up(LiquidCrystal &lcd) {
+    if (gps.charsProcessed() < 10) {
+        static const char line1[] PROGMEM = "No GPS data.";
+        static const char line2[] PROGMEM = "check wiring.";
+        update_lcd_P(lcd, line1, line2);
+    }
+    else {
+        static const char line1[] PROGMEM = "No GPS signal.";
+        static const char line2[] PROGMEM = "Try outside.";
+        update_lcd_P(lcd, line1, line2);
+    }
+    smartDelay(DisplayTime * 1000);
+    turn_off(lcd);
+
+    // without a power switch we are still running, and
+    // the callers need the gps, so stop here
+    while (true) {
+    }
+
+} // gps_give_up
+
+
+// ----------------------------------------------------------------------
+// see if the gps has sent a recent, believable date and time. Before the
+// gps module knows the time it sends empty fields, which TinyGPSPlus reads
+// as valid zeros (the year 2000, month 0).
+// 
+bool gps_time_ok() {
+    return gps.date.isValid() && gps.time.isValid()
+        && gps.date.age() < GpsMaxAge && gps.time.age() < GpsMaxAge
+        && gps.date.year() >= GpsMinYear && gps.date.year() <= GpsMaxYear
+        && gps.date.month() >= 1 && gps.date.month() <= 12
+        && gps.date.day() >= 1 && gps.date.day() <= 31;
+
+} // gps_time_ok
+
+
+// ----------------------------------------------------------------------
+// wait for the gps to send the date and time. This only needs one
+// satellite so it works in places where a position fix might not.
+// Gives up and turns off after GpsFixTimeout seconds.
+// 
+void wait_for_gps_time(LiquidCrystal &lcd) {
+    if (gps_time_ok()) {
+        return;
+    }
+
+    static const char line1[] PROGMEM = "Getting time...";
+    static const char line2[] PROGMEM = "";
+    update_lcd_P(lcd, line1, line2);
+
+    unsigned long const start = millis();
+    while (!gps_time_ok()) {
+        unsigned long const elapsed = millis() - start;
+        if (elapsed >= GpsFixTimeout * 1000UL) {
+            gps_give_up(lcd);
+        }
+
+        char secs[8];
+        sprintf(secs, "%3us", unsigned(elapsed / 1000));
+        lcd.setCursor(12, 1);
+        lcd.print(secs);
+
+        smartDelay(1000);
+    }
+
+} // wait_for_gps_time
+
+
+// ----------------------------------------------------------------------
 // wait until we get a steady lock on the satellites, showing the number
 // of satellites and time waited. Gives up and turns off if there is no
 // fix after GpsFixTimeout seconds.
@@ -96,23 +168,7 @@ void wait_for_gps(LiquidCrystal &lcd) {
             }
         }
         else if (timed_out) {
-            if (gps.charsProcessed() < 10) {
-                static const char line1[] PROGMEM = "No GPS data.";
-                static const char line2[] PROGMEM = "check wiring.";
-                update_lcd_P(lcd, line1, line2);
-            }
-            else {
-                static const char line1[] PROGMEM = "No GPS signal.";
-                static const char line2[] PROGMEM = "Try outside.";
-                update_lcd_P(lcd, line1, line2);
-            }
-            smartDelay(DisplayTime * 1000);
-            turn_off(lcd);
-
-            // without a power switch we are still running, and
-            // the callers need a fix, so stop here
-            while (true) {
-            }
+            gps_give_up(lcd);
         }
 
         // only redraw the whole display when the top line changes
@@ -449,6 +505,7 @@ void target_success(LiquidCrystal &lcd) {
 void update_target_display(LiquidCrystal &lcd) {
 
     // Use Clock Mode if all targets have been solved.
+    // This only needs the time, not a position fix.
     if (config_data.get_num_targets() == 0) {
         // we have unlocked all of the targets.
         show_datetime(lcd);
@@ -458,7 +515,8 @@ void update_target_display(LiquidCrystal &lcd) {
         return;
     }
 
-    // We have GPS now so our location, date, and time are correct
+    // wait until we get a steady satellite lock:
+    wait_for_gps(lcd);
 
     double const miles = get_target_miles();
 
@@ -636,6 +694,12 @@ void check_developer_lock(LiquidCrystal &lcd) {
 #endif
 
     if (config_data.get_num_targets() == 0) {
+        // the hunt is over, so just carry on to the clock
+        if (config_data.get_total_targets() > 0) {
+            return;
+        }
+
+        // the box has never been programmed
         static char const line1[] PROGMEM = "  Lock Stopped  ";
         static char const line2[] PROGMEM = "   No Targets   ";
         update_lcd_P(lcd, line1, line2);
@@ -713,10 +777,7 @@ bool is_bst(int year, int month, int day, int hour) {
 // GMT. tm_isdst is set when it is BST.
 // 
 tm get_uk_time(LiquidCrystal &lcd) {
-    wait_for_gps(lcd);
-    while (!gps.date.isValid() || !gps.time.isValid()) {
-        smartDelay();
-    }
+    wait_for_gps_time(lcd);
 
     int year = gps.date.year();
     int month = gps.date.month();

@@ -95,7 +95,9 @@ enum MagicNumber_t {
 
     GpsFixTimeout = 120,        // seconds to wait for a gps fix before giving up
     GpsSettleTime = 5,          // seconds to let a new gps fix settle
-    GpsMaxAge = 2000,           // ms before a gps location is too old to use
+    GpsMaxAge = 2000,           // ms before a gps location or time is too old to use
+    GpsMinYear = 2025,          // years outside this range mean the gps
+    GpsMaxYear = 2079,          // doesn't know the date yet
     MaxHdop = 200,              // gps fix is accurate enough at or below this
                                 // HDOP (in hundredths, so 2.0)
 
@@ -117,6 +119,9 @@ enum ServoPos_t {
 void smartDelay(unsigned long ms = 0);
 void init_serial();
 void init_gps();
+void gps_give_up(LiquidCrystal &lcd);
+bool gps_time_ok();
+void wait_for_gps_time(LiquidCrystal &lcd);
 void wait_for_gps(LiquidCrystal &lcd);
 void moveServo(uint8_t const pos);
 void lock_box();
