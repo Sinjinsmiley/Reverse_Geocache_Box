@@ -10,36 +10,31 @@
 #define EEPROM_DATA
 
 #include <EEPROM.h>
-#include "datetime.h"
 
 // Redefine as needed (and memory allows)
 #define   MAX_TARGETS    8
 
-// Redefine as needed (and memory allows)
-#define   MAX_DATES      8
+// Redefine as needed (and EEPROM size allows)
+// Also used for the length of the unlock message
+#define   MAX_CLUE_LEN   32
 
 // The persistent values in EEPROM
 class eeprom_data_t 
 {
 private:
+    // changed whenever the layout of the data changes so that
+    // older data is reset instead of being read incorrectly
     static const 
-    uint8_t Signature {0xA5};
-
-    uint8_t DefaultTries {50};
+    uint8_t Signature {0xA8};
 
     uint8_t signature {0};
-    uint8_t dirty {0};
-    uint8_t tries {0};
     uint8_t locked {0};
+    uint8_t total_targets {0};      // number of targets when the box was programmed
+    double  last_miles {0.0};       // distance at the last check, 0 if none yet
     struct {
         double      lat {0.0};
         double      lon {0.0};
     } targets[MAX_TARGETS];
-
-    struct alert_t {
-        datetime_t dt;
-        char msg[2][17] { "                ", "                " };
-    } dates[MAX_DATES];
 
 public:
 
@@ -47,21 +42,21 @@ public:
     {
     }
     
+    // reset to blank data with no targets or clues
     void init()
     {
+        *this = eeprom_data_t();
         signature = Signature;
-        tries = DefaultTries;
-        dirty = true;
+
+        for (int num = 0; num < MAX_TARGETS; ++num) {
+            set_clue(num, "");
+        }
+        set_unlock_message("");
     }
 
     bool isValid() const
     {
         return Signature == signature;
-    }
-
-    bool isDirty() const
-    {
-        return dirty;
     }
 
     bool isLocked() const
@@ -71,18 +66,12 @@ public:
 
     void setLocked()
     {
-        if (!locked) {
-            locked = true;
-            dirty = true;
-        }
+        locked = true;
     }
 
     void setUnlocked()
     {
-        if (locked) {
-            locked = false;
-            dirty = true;
-        }
+        locked = false;
     }
 
     // ----------------------------------------------------------------------
@@ -100,20 +89,51 @@ public:
     }
 
     bool remove_target(int num) {
-        if (num >= get_num_targets())
+        int const count = get_num_targets();
+        if (num >= count)
             return false;
 
-        dirty = true;
-        for (; num < get_num_targets()-1; num++) {
+        char clue[MAX_CLUE_LEN + 1];
+        for (; num < count - 1; num++) {
             targets[num] = targets[num + 1];
+            get_clue(num + 1, clue);
+            set_clue(num, clue);
         }
 
         for (; num < int(ARRAYSZ(targets)); ++num) {
             targets[num].lat = 0.0;
             targets[num].lon = 0.0;
+            set_clue(num, "");
         }
+
+        // there is no previous distance to the new current target
+        last_miles = 0.0;
         
         return true;
+    }
+
+    // remember how many targets there are now, for showing progress
+    void set_total_targets()
+    {
+        total_targets = get_num_targets();
+    }
+
+    int get_total_targets() const
+    {
+        return total_targets;
+    }
+
+    // ----------------------------------------------------------------------
+    // Distance at the last check, for hotter/colder
+
+    double get_last_miles() const
+    {
+        return last_miles;
+    }
+
+    void set_last_miles(double const miles)
+    {
+        last_miles = miles;
     }
 
     double get_target_lat(int cur=0) const
@@ -123,10 +143,7 @@ public:
     
     void set_target_lat(double const latitude, int cur)
     {
-        if (targets[cur].lat != latitude) {
-            targets[cur].lat = latitude;
-            dirty = true;
-        }
+        targets[cur].lat = latitude;
     }
 
     double get_target_lon(int cur = 0) const
@@ -136,101 +153,61 @@ public:
     
     void set_target_lon(double const longitude, int cur)
     {
-        if (targets[cur].lon != longitude) {
-            targets[cur].lon = longitude;
-            dirty = true;
-        }
+        targets[cur].lon = longitude;
     }
 
     // ----------------------------------------------------------------------
-    // Number of Tries:
+    // Clues and the unlock message
+    // These are kept in the EEPROM just after the rest of this data, a
+    // clue for each target and then the unlock message, and are only read
+    // when needed so they don't take up any SRAM. Unlike the rest of the
+    // data they are written right away. Longer text is cut to MAX_CLUE_LEN
+    // chars, and buf must hold MAX_CLUE_LEN + 1 chars.
 
-    uint8_t get_default_tries() const
+    // num is the target number, or MAX_TARGETS for the unlock message
+    static int text_address(int num)
     {
-        return DefaultTries;
+        return sizeof(eeprom_data_t) + num * (MAX_CLUE_LEN + 1);
     }
 
-    void set_default_tries(uint8_t t)
+    static void read_text(int addr, char buf[])
     {
-        DefaultTries = t;
-    }
-
-    uint16_t get_num_tries() const
-    {
-        return tries;
-    }
-
-    void set_tries(uint16_t const t)
-    {
-        if (tries != t) {
-            tries = t;
-            dirty = true;
-        }
-    }
-
-    uint16_t reduce_tries()
-    {
-        if (tries > 0)
-        {
-            dirty = true;
-            return --tries;
-        }
-
-        return 0;
-    }
-
-    // ----------------------------------------------------------------------
-    // Alerts for special dates/times:
-
-    int get_num_alerts() const
-    {
-        unsigned num = 0;
-        for (; num < ARRAYSZ(dates); num++)
-        {
-            if (dates[num].dt.get_year() == 0)
+        for (int i = 0; i < MAX_CLUE_LEN; ++i) {
+            buf[i] = EEPROM.read(addr + i);
+            if (buf[i] == '\0')
                 break;
         }
-
-        return num;
+        buf[MAX_CLUE_LEN] = '\0';
     }
 
-    bool get_alert(unsigned i, datetime_t &dt, char msg1[], char msg2[]) const
+    static void write_text(int addr, char const *text)
     {
-        if (i < ARRAYSZ(dates))
-        {
-            dt = dates[i].dt;
-            strcpy(msg1, dates[i].msg[0]);
-            strcpy(msg2, dates[i].msg[1]);
-
-            return true;
+        int i = 0;
+        for (; i < MAX_CLUE_LEN && text[i] != '\0'; ++i) {
+            EEPROM.update(addr + i, text[i]);
         }
-
-        return false;
+        EEPROM.update(addr + i, '\0');
     }
 
-    bool add_alert(datetime_t const &dt, char const *msg1, char const *msg2)
+    void get_clue(int num, char buf[]) const
     {
-        unsigned num = get_num_alerts();
-        for (unsigned i = 0; i < num; ++i) {
-            alert_t &alert = dates[i];
-            if (alert.dt == dt && !strcmp(alert.msg[0], msg1) && !strcmp(alert.msg[1], msg2)) {
-                return true;
-            }
-        }
+        read_text(text_address(num), buf);
+    }
 
-        if (num >= ARRAYSZ(dates)) {
-            return  false;
-        }
+    void set_clue(int num, char const *clue)
+    {
+        write_text(text_address(num), clue);
+    }
 
-        alert_t &alert = dates[num];
+    // shown when the last target is reached and the box unlocks
+    void get_unlock_message(char buf[]) const
+    {
+        read_text(text_address(MAX_TARGETS), buf);
+    }
 
-        alert.dt = dt;
-        strcpy(alert.msg[0], msg1);
-        strcpy(alert.msg[1], msg2);
-
-        dirty = true;
-
-        return true;
+    void set_unlock_message(char const *msg)
+    {
+        write_text(text_address(MAX_TARGETS), msg);
     }
 
     // ----------------------------------------------------------------------
@@ -246,17 +223,14 @@ public:
             save();
         }
 
-        dirty = false;
-
         return isValid();
     }
 
+    // EEPROM.put() only writes the bytes that have changed,
+    // so saving often doesn't wear out the EEPROM
     void save()
     {
-//        if (dirty) {
-            dirty = false;
-            EEPROM.put(0, *this);
-//        }
+        EEPROM.put(0, *this);
     }
 
 };

@@ -8,34 +8,34 @@
 |*| 
 |*| [+] Box only unlocks at a special location.
 |*| [+] Written for Arduino Nano but this will work with any other 
-|*|     Arduino except ATTiny due to pins. (would work w/o music)
+|*|     Arduino that has enough pins.
 |*| [+] Runs on 2 3.7V rechargeable lipo batteries
 |*| [+] 5V LDO (low drop-out) regulator circuit
 |*| [+] Uses solid state power button.  Turns itself off.  0.000A used when off.
-|*| [+] I2C LCD display
+|*| [+] 16x2 LCD display (4-bit parallel)
 |*| [+] 4800 baud serial GPS module
 |*| [+] Metal Gear Digital Servo controls the box lock mechanism
-|*| [+] Amplifier module and 2W speaker
-|*| [+] Plays any MIDI tune on success using the Playtune library and Miditones
-|*|     utility available at https://github.com/LenShustek/miditones.git
 |*| [+] Hidden easter egg to unlock or get into internal debugger/setup mode
-|*| [+] Displays messages and plays sounds on important dates.
-|*| [+] Up to 8 special dates/times with messages can be stored!
 |*| [+] Up to 8 sequential targets can be configured!
-|*| [+] All configurable target(s), important date(s) and messages, and
-|*|     remaining tries are stored in EEPROM.
+|*| [+] Each target has a clue of up to 32 characters that is shown
+|*|     (scrolling if needed) along with the distance to it.
+|*| [+] Says whether each check is hotter or colder than the last one.
+|*| [+] Shows progress through the targets ("Location 2 of 4").
+|*| [+] Shows a message from the giver when the box unlocks.
+|*| [+] Waits for a steady GPS fix, and gives up with a message if
+|*|     there is no signal.
+|*| [+] All configurable target(s), clue(s), and the unlock message are
+|*|     stored in EEPROM.
 |*| [+] Detects if EEPROM has never been programmed and automatically
 |*|     updates it the first time if needed.
 |*| [+] Only modified values are updated in EEPROM - saves write cycles
 |*| [+] Displays battery voltage and cpu temperature using the ATMega328's
 |*|     internal ADC and diode!
-|*| [+] Clock mode
-|*| [+] Menu system
+|*| [+] Clock mode, showing UK time (GMT or BST)
 |*| 
 |*| TODO:
 |*| [ ] give the user a direction heading
 |*| [ ] menu for user-configurable target(s)
-|*| [ ] menu for user-configurable important date(s) and messages
 |*| [ ] alarms during clock mode
 |*| 
 \*/
@@ -57,6 +57,76 @@ eeprom_data_t    config_data;
 
 // ======================================================================
 
+#if defined(PROGRAM_EEPROM)
+#warning compiling for PROGRAM_EEPROM.
+
+// ----------------------------------------------------------------------
+// unlock the box so the gift can be put inside, write new target(s),
+// clue(s), and the unlock message to the EEPROM, and show the clue and
+// distance for the first target. Never returns.
+//
+void program_box(LiquidCrystal &lcd)
+{
+    // open the box so the gift can be put inside. Load the saved lock
+    // state first so the servo moves smoothly from where it was left.
+    config_data.load();
+    unlock_box();
+
+    // start from blank data, replacing any old target(s), clue(s), and
+    // message. This leaves it marked as unlocked so the next normal power
+    // on runs the locking countdown.
+    config_data.init();
+
+    // Set at least one target, up to MAX_TARGETS, each with a clue of up
+    // to MAX_CLUE_LEN characters. Clues longer than 16 characters scroll
+    // across the display. Targets must be reached in order: 0, 1, 2, ...
+    static const double LONDON_LAT = 51.509865, LONDON_LON = -0.118092;
+    config_data.set_target_lat(LONDON_LAT, 0);
+    config_data.set_target_lon(LONDON_LON, 0);
+    config_data.set_clue(0, "Mind the gap near the Thames");
+
+    // remember how many targets were set so progress can be shown
+    config_data.set_total_targets();
+
+    // Set the message shown when the box unlocks, up to MAX_CLUE_LEN
+    // characters over the two lines. Leave it empty for no message.
+    config_data.set_unlock_message("Happy birthday! Enjoy your gift");
+
+    config_data.save();
+
+    // wait until we get a valid satellite lock:
+    wait_for_gps(lcd);
+
+    // show how many targets were saved, then the first clue and distance
+    char line1[32] = "";
+    static char const fmtP[] PROGMEM = "Targets saved: %d";
+    char fmt[20];
+    strcpy_P(fmt, fmtP);
+    sprintf(line1, fmt, config_data.get_num_targets());
+    update_lcd(lcd, line1);
+    smartDelay(2000);
+
+    static char const no_hint[] PROGMEM = "";
+    show_target(lcd, get_target_miles(), no_hint);
+
+    // remind the developer to turn this mode off, otherwise every
+    // power on erases any progress and unlocks the box again
+    static char const done1[] PROGMEM = "Done. Now remove";
+    static char const done2[] PROGMEM = " PROGRAM_EEPROM ";
+    update_lcd_P(lcd, done1, done2);
+    smartDelay(DisplayTime * 1000);
+
+    turn_off(lcd);
+
+    // without a power switch we are still running so stop here
+    // instead of falling through to the normal game
+    while (true) {
+    }
+
+} // program_box
+
+#endif
+
 void loop()
 {
 }
@@ -65,45 +135,17 @@ void setup()
 {
     init_serial();
 
-    LiquidCrystal_I2C lcd(I2C_Disp_Addr, 16, 2);
-    lcd.init();
-    lcd.backlight();
+    LiquidCrystal lcd(LcdRSPin, LcdEnPin, LcdD4Pin, LcdD5Pin, LcdD6Pin, LcdD7Pin);
+    lcd.begin(16, 2);
 
     init_gps();
 
     // ------------------------------------------------------------
-    // run the following at least once to update the EEPROM with
-    // updated target(s), date(s), and number of remaining retries
-#if 0
-
-    // ------------------------------------------------------------
-    // set up the new persistent data from the EEPROM:
-    config_data.init();
-    config_data.save();
-
-    config_data.set_default_tries(DefaultTries);
-
-    // Set any special date(s). Date and time are gmt
-    datetime_t alert = datetime_t(2022, 12, 29, 20, 30, 0);
-    config_data.add_alert(alert, "Alert", "One");
-
-    // Set at least one target:
-    static const double LONDON_LAT = 51.509865, LONDON_LON = -0.118092;
-    config_data.set_target_lat(LONDON_LAT, 0);
-    config_data.set_target_lon(LONDON_LON, 0);
-
-    unlock_box();
-
-    config_data.save();
-
-    // wait until we get a valid satellite lock:
-    wait_for_gps(lcd);
-
-    update_target_display(lcd);
-    smartDelay(DisplayTime * 1000);
-
-    turn_off(lcd);
-
+    // enable PROGRAM_EEPROM in utilities.h and run once to update the
+    // EEPROM with the target(s) and clue(s) that are set
+    // in program_box() above
+#if defined(PROGRAM_EEPROM)
+    program_box(lcd);
 #endif
 
 #if defined(SELF_TEST)
@@ -131,16 +173,9 @@ void setup()
     check_developer_lock(lcd);
 
     // ------------------------------------------------------------
-    // wait until we get a valid satellite lock:
-    wait_for_gps(lcd);
-
-    // ------------------------------------------------------------
-    // check for special dates
-    check_dates(lcd);
-
-    // ------------------------------------------------------------
-    // update the display with the target distance
-    // and reduce the number of remaining tries
+    // update the display with the clue for the target, the
+    // distance to it, and whether it is hotter or colder, or
+    // show the clock if the hunt is over
     update_target_display(lcd);
 
 #endif
