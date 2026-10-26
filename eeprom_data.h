@@ -15,6 +15,7 @@
 #define   MAX_TARGETS    8
 
 // Redefine as needed (and EEPROM size allows)
+// Also used for the length of the unlock message
 #define   MAX_CLUE_LEN   32
 
 // The persistent values in EEPROM
@@ -24,11 +25,13 @@ private:
     // changed whenever the layout of the data changes so that
     // older data is reset instead of being read incorrectly
     static const 
-    uint8_t Signature {0xA6};
+    uint8_t Signature {0xA7};
 
     uint8_t signature {0};
     uint8_t dirty {0};
     uint8_t locked {0};
+    uint8_t total_targets {0};      // number of targets when the box was programmed
+    double  last_miles {0.0};       // distance at the last check, 0 if none yet
     struct {
         double      lat {0.0};
         double      lon {0.0};
@@ -50,6 +53,7 @@ public:
         for (int num = 0; num < MAX_TARGETS; ++num) {
             set_clue(num, "");
         }
+        set_unlock_message("");
     }
 
     bool isValid() const
@@ -115,8 +119,39 @@ public:
             targets[num].lon = 0.0;
             set_clue(num, "");
         }
+
+        // there is no previous distance to the new current target
+        last_miles = 0.0;
         
         return true;
+    }
+
+    // remember how many targets there are now, for showing progress
+    void set_total_targets()
+    {
+        total_targets = get_num_targets();
+        dirty = true;
+    }
+
+    int get_total_targets() const
+    {
+        return total_targets;
+    }
+
+    // ----------------------------------------------------------------------
+    // Distance at the last check, for hotter/colder
+
+    double get_last_miles() const
+    {
+        return last_miles;
+    }
+
+    void set_last_miles(double const miles)
+    {
+        if (last_miles != miles) {
+            last_miles = miles;
+            dirty = true;
+        }
     }
 
     double get_target_lat(int cur=0) const
@@ -146,20 +181,21 @@ public:
     }
 
     // ----------------------------------------------------------------------
-    // Clues
-    // The clues are kept in the EEPROM just after the rest of this data
-    // and are only read when needed so they don't take up any SRAM.
-    // Unlike the rest of the data they are written right away.
+    // Clues and the unlock message
+    // These are kept in the EEPROM just after the rest of this data, a
+    // clue for each target and then the unlock message, and are only read
+    // when needed so they don't take up any SRAM. Unlike the rest of the
+    // data they are written right away. Longer text is cut to MAX_CLUE_LEN
+    // chars, and buf must hold MAX_CLUE_LEN + 1 chars.
 
-    static int clue_address(int num)
+    // num is the target number, or MAX_TARGETS for the unlock message
+    static int text_address(int num)
     {
         return sizeof(eeprom_data_t) + num * (MAX_CLUE_LEN + 1);
     }
 
-    // copy the clue for a target into buf, which must hold MAX_CLUE_LEN + 1 chars
-    void get_clue(int num, char buf[]) const
+    static void read_text(int addr, char buf[])
     {
-        int const addr = clue_address(num);
         for (int i = 0; i < MAX_CLUE_LEN; ++i) {
             buf[i] = EEPROM.read(addr + i);
             if (buf[i] == '\0')
@@ -168,15 +204,34 @@ public:
         buf[MAX_CLUE_LEN] = '\0';
     }
 
-    // set the clue for a target. Longer clues are cut to MAX_CLUE_LEN chars.
-    void set_clue(int num, char const *clue)
+    static void write_text(int addr, char const *text)
     {
-        int const addr = clue_address(num);
         int i = 0;
-        for (; i < MAX_CLUE_LEN && clue[i] != '\0'; ++i) {
-            EEPROM.update(addr + i, clue[i]);
+        for (; i < MAX_CLUE_LEN && text[i] != '\0'; ++i) {
+            EEPROM.update(addr + i, text[i]);
         }
         EEPROM.update(addr + i, '\0');
+    }
+
+    void get_clue(int num, char buf[]) const
+    {
+        read_text(text_address(num), buf);
+    }
+
+    void set_clue(int num, char const *clue)
+    {
+        write_text(text_address(num), clue);
+    }
+
+    // shown when the last target is reached and the box unlocks
+    void get_unlock_message(char buf[]) const
+    {
+        read_text(text_address(MAX_TARGETS), buf);
+    }
+
+    void set_unlock_message(char const *msg)
+    {
+        write_text(text_address(MAX_TARGETS), msg);
     }
 
     // ----------------------------------------------------------------------

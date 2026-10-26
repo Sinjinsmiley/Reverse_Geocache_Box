@@ -45,15 +45,83 @@ void init_gps() {
 
 
 // ----------------------------------------------------------------------
-// Show the initial display text until we get a lock on a satelite:
+// wait until we get a steady lock on the satellites, showing the number
+// of satellites and time waited. Gives up and turns off if there is no
+// fix after GpsFixTimeout seconds.
 // 
 void wait_for_gps(LiquidCrystal &lcd) {
-    static const char line1[] PROGMEM = "Waiting on GPS..";
-    static const char line2[] PROGMEM = "";
-    update_lcd_P(lcd, line1, line2);
+    // kept between calls so that we only wait for a steady fix once
+    static bool          ready = false;
+    static bool          have_fix = false;
+    static unsigned long fix_time = 0;      // when we first got a fix
 
-    while (!gps.location.isValid()) {
-        smartDelay();
+    if (ready) {
+        return;
+    }
+
+    unsigned long const start = millis();
+    bool shown_fix = false;
+    bool first = true;
+
+    while (true) {
+        unsigned long const elapsed = millis() - start;
+        bool const timed_out = elapsed >= GpsFixTimeout * 1000UL;
+
+        if (gps.location.isValid()) {
+            if (!have_fix) {
+                have_fix = true;
+                fix_time = millis();
+            }
+
+            bool const accurate = gps.hdop.isValid() && gps.hdop.value() <= MaxHdop;
+            bool const settled = millis() - fix_time >= GpsSettleTime * 1000UL;
+
+            // use the fix once it is accurate and has settled, or use
+            // it anyway if it doesn't get accurate before the timeout
+            if ((accurate && settled) || timed_out) {
+                ready = true;
+                return;
+            }
+        }
+        else if (timed_out) {
+            if (gps.charsProcessed() < 10) {
+                static const char line1[] PROGMEM = "No GPS data.";
+                static const char line2[] PROGMEM = "check wiring.";
+                update_lcd_P(lcd, line1, line2);
+            }
+            else {
+                static const char line1[] PROGMEM = "No GPS signal.";
+                static const char line2[] PROGMEM = "Try outside.";
+                update_lcd_P(lcd, line1, line2);
+            }
+            smartDelay(DisplayTime * 1000);
+            turn_off(lcd);
+
+            // without a power switch we are still running, and
+            // the callers need a fix, so stop here
+            while (true) {
+            }
+        }
+
+        // only redraw the whole display when the top line changes
+        // so that the progress on the bottom line doesn't flicker
+        char line2[32];
+        sprintf(line2, "Sats: %-2d    %3us", int(gps.satellites.value()), unsigned(elapsed / 1000));
+        if (first || have_fix != shown_fix) {
+            static const char waiting[] PROGMEM = "Waiting on GPS..";
+            static const char steadying[] PROGMEM = "Steadying GPS...";
+            char line1[17];
+            strcpy_P(line1, have_fix ? steadying : waiting);
+            update_lcd(lcd, line1, line2);
+            first = false;
+            shown_fix = have_fix;
+        }
+        else {
+            lcd.setCursor(0, 1);
+            lcd.print(line2);
+        }
+
+        smartDelay(1000);
     }
 
 } // wait_for_gps
@@ -216,6 +284,38 @@ void scroll_lcd(LiquidCrystal &lcd, char const *line1, char const *line2, unsign
 
 
 // ----------------------------------------------------------------------
+// show up to 32 chars of text over both lines, breaking
+// the line at a space where possible
+// 
+void show_wrapped(LiquidCrystal &lcd, char const *text) {
+    int const len = strlen(text);
+    int brk = len;      // where line 1 ends
+    int next = len;     // where line 2 starts
+
+    if (len > 16) {
+        brk = next = 16;
+
+        // break at the last space that fits on line 1, if the rest fits on line 2
+        for (int i = 16; i > 0; --i) {
+            if (text[i] == ' ' && len - (i + 1) <= 16) {
+                brk = i;
+                next = i + 1;
+                break;
+            }
+        }
+    }
+
+    char line1[17], line2[17];
+    strncpy(line1, text, brk);
+    line1[brk] = '\0';
+    strncpy(line2, text + next, 16);
+    line2[16] = '\0';
+    update_lcd(lcd, line1, line2);
+
+} // show_wrapped
+
+
+// ----------------------------------------------------------------------
 // turn the lcd display off
 // 
 void lcd_off(LiquidCrystal &lcd) {
@@ -229,19 +329,6 @@ void lcd_off(LiquidCrystal &lcd) {
 // display the current latitude and longitude. for debugging/testing
 // 
 void update_local_display(LiquidCrystal &lcd) {
-    while (!gps.location.isValid()) {
-        smartDelay(100);
-        if (millis() >= 30000 && gps.charsProcessed() < 10) {
-            static const char line1[] PROGMEM = "No GPS data.";
-            static const char line2[] PROGMEM = "check wiring.";
-            update_lcd_P(lcd, line1, line2);
-            smartDelay(DisplayTime * 1000);
-            turn_off(lcd);
-
-            return;
-        }
-    }
-
 //    double next_lat = config_data.get_target_lat(0);
 //    double next_lon = config_data.get_target_lon(0);
 
@@ -260,17 +347,29 @@ void update_local_display(LiquidCrystal &lcd) {
 
 
 // ----------------------------------------------------------------------
-// show the clue for the current target on the top line, scrolling
-// if needed, and the distance to it on the bottom line
+// show the clue for the current target on the top line, scrolling if
+// needed, and the distance to it on the bottom line with the hint (from
+// PROGMEM) on the right. e.g. "3.42 mi   Hotter"
 // 
-void show_target(LiquidCrystal &lcd) {
+void show_target(LiquidCrystal &lcd, double miles, char const *hint) {
     char clue[MAX_CLUE_LEN + 1];
     config_data.get_clue(0, clue);
 
+    // drop the decimals for far away targets so the line still fits
     char line2[32];
-    dtostrf(get_target_miles(), 7, 2, line2);
-    static char const miles[] PROGMEM = " miles.";
-    strcat_P(line2, miles);
+    dtostrf(miles, 1, (miles >= 1000.0) ? 0 : 2, line2);
+    static char const mi[] PROGMEM = " mi";
+    strcat_P(line2, mi);
+
+    char hint_buf[8];
+    strcpy_P(hint_buf, hint);
+    int len = strlen(line2);
+    int const pad = 16 - len - int(strlen(hint_buf));
+    for (int i = 0; i < pad; ++i) {
+        line2[len++] = ' ';
+    }
+    line2[len] = '\0';
+    strcat(line2, hint_buf);
 
     scroll_lcd(lcd, clue, line2, DisplayTime * 1000);
 
@@ -292,26 +391,48 @@ void target_success(LiquidCrystal &lcd) {
         static const char line2[] PROGMEM = " Box Unlocked!";
         update_lcd_P(lcd, line1, line2);
         unlock_box();
+        config_data.save();
+        smartDelay(DisplayTime * 1000);
+
+        // show the giver's message, if there is one
+        char msg[MAX_CLUE_LEN + 1];
+        config_data.get_unlock_message(msg);
+        if (msg[0] != '\0') {
+            show_wrapped(lcd, msg);
+            smartDelay(DisplayTime * 1000);
+        }
+
+        return;
     }
-    else {
-        static const char line2[] PROGMEM = " More Targets!! ";
-        update_lcd_P(lcd, line1, line2);
-    }
+
+    // say which location is next
+    int const total = config_data.get_total_targets();
+    char line2[32];
+    static char const fmtP[] PROGMEM = "  On to %d of %d";
+    char fmt[20];
+    strcpy_P(fmt, fmtP);
+    sprintf(line2, fmt, total - config_data.get_num_targets() + 1, total);
+    char data1[17];
+    strcpy_P(data1, line1);
+    update_lcd(lcd, data1, line2);
 
     config_data.save();
-
     smartDelay(DisplayTime * 1000);
 
-    // show where to go next
-    if (config_data.get_num_targets() > 0) {
-        show_target(lcd);
-    }
+    // show where to go next. hotter/colder is measured from here.
+    double const miles = get_target_miles();
+    config_data.set_last_miles(miles);
+    config_data.save();
+
+    static char const no_hint[] PROGMEM = "";
+    show_target(lcd, miles, no_hint);
 }
 
 
 // ----------------------------------------------------------------------
-// update the display with the clue for the target and the distance to
-// it. Handles arriving at target(s) and possibly unlocking the box.
+// update the display with the clue for the target, the distance to it,
+// and whether it is hotter or colder than the last check. Handles
+// arriving at target(s) and possibly unlocking the box.
 // 
 void update_target_display(LiquidCrystal &lcd) {
 
@@ -325,31 +446,59 @@ void update_target_display(LiquidCrystal &lcd) {
         return;
     }
 
-    // wait for gps location to be available
-    // alerts for problems in the wiring after 30 second timeout
-    while (!gps.location.isValid()) {
-        smartDelay(100);
-        if (millis() >= GpsTimeout && gps.charsProcessed() < 10) {
-            static const char line1[] PROGMEM = "No GPS data.";
-            static const char line2[] PROGMEM = "check wiring.";
-            update_lcd_P(lcd, line1, line2);
-            smartDelay(DisplayTime * 1000);
-            turn_off(lcd);
-
-            return;
-        }
-    }
-
     // We have GPS now so our location, date, and time are correct
 
-    if (get_target_miles() <= 0.01) {
+    double const miles = get_target_miles();
+
+    if (miles <= 0.01) {
         target_success(lcd);
         turn_off(lcd);
 
         return;
     }
 
-    show_target(lcd);
+    // show which location this is if there is more than one
+    int const total = config_data.get_total_targets();
+    if (total > 1) {
+        char line1[32];
+        static char const fmtP[] PROGMEM = "Location %d of %d";
+        char fmt[20];
+        strcpy_P(fmt, fmtP);
+        sprintf(line1, fmt, total - config_data.get_num_targets() + 1, total);
+        update_lcd(lcd, line1);
+        smartDelay(ProgressTime * 1000);
+    }
+
+    // compare with the distance at the last check. The last distance only
+    // moves on when the change is big enough to count, so that several
+    // small steps in the same direction still add up to hotter or colder.
+    static char const no_hint[] PROGMEM = "";
+    static char const hotter[] PROGMEM = "Hotter";
+    static char const colder[] PROGMEM = "Colder";
+    static char const same[] PROGMEM = "Same";
+
+    double const last = config_data.get_last_miles();
+    double const margin = HotColdFeet / 5280.0;
+    char const *hint = no_hint;
+
+    if (last <= 0.0) {
+        config_data.set_last_miles(miles);
+    }
+    else if (miles < last - margin) {
+        hint = hotter;
+        config_data.set_last_miles(miles);
+    }
+    else if (miles > last + margin) {
+        hint = colder;
+        config_data.set_last_miles(miles);
+    }
+    else {
+        hint = same;
+    }
+
+    config_data.save();
+
+    show_target(lcd, miles, hint);
 
     turn_off(lcd);
 

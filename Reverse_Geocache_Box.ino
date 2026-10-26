@@ -19,7 +19,13 @@
 |*| [+] Up to 8 sequential targets can be configured!
 |*| [+] Each target has a clue of up to 32 characters that is shown
 |*|     (scrolling if needed) along with the distance to it.
-|*| [+] All configurable target(s) and clue(s) are stored in EEPROM.
+|*| [+] Says whether each check is hotter or colder than the last one.
+|*| [+] Shows progress through the targets ("Location 2 of 4").
+|*| [+] Shows a message from the giver when the box unlocks.
+|*| [+] Waits for a steady GPS fix, and gives up with a message if
+|*|     there is no signal.
+|*| [+] All configurable target(s), clue(s), and the unlock message are
+|*|     stored in EEPROM.
 |*| [+] Detects if EEPROM has never been programmed and automatically
 |*|     updates it the first time if needed.
 |*| [+] Only modified values are updated in EEPROM - saves write cycles
@@ -56,13 +62,13 @@ eeprom_data_t    config_data;
 #warning compiling for PROGRAM_EEPROM.
 
 // ----------------------------------------------------------------------
-// write new target(s) and clue(s) to the EEPROM, unlock the box so
-// the gift can be put inside, and show the clue and distance for the
-// first target. Never returns.
+// write new target(s), clue(s), and the unlock message to the EEPROM,
+// unlock the box so the gift can be put inside, and show the clue and
+// distance for the first target. Never returns.
 //
 void program_box(LiquidCrystal &lcd)
 {
-    // start from blank data, replacing any old target(s) and clue(s)
+    // start from blank data, replacing any old target(s), clue(s), and message
     config_data.init();
 
     // Set at least one target, up to MAX_TARGETS, each with a clue of up
@@ -72,6 +78,13 @@ void program_box(LiquidCrystal &lcd)
     config_data.set_target_lat(LONDON_LAT, 0);
     config_data.set_target_lon(LONDON_LON, 0);
     config_data.set_clue(0, "Mind the gap near the Thames");
+
+    // remember how many targets were set so progress can be shown
+    config_data.set_total_targets();
+
+    // Set the message shown when the box unlocks, up to MAX_CLUE_LEN
+    // characters over the two lines. Leave it empty for no message.
+    config_data.set_unlock_message("Happy birthday! Enjoy your gift");
 
     // open the box and leave it marked as unlocked so the
     // next normal power on runs the locking countdown
@@ -91,7 +104,8 @@ void program_box(LiquidCrystal &lcd)
     update_lcd(lcd, line1);
     smartDelay(2000);
 
-    show_target(lcd);
+    static char const no_hint[] PROGMEM = "";
+    show_target(lcd, get_target_miles(), no_hint);
 
     // remind the developer to turn this mode off, otherwise every
     // power on erases any progress and unlocks the box again
@@ -157,12 +171,12 @@ void setup()
     check_developer_lock(lcd);
 
     // ------------------------------------------------------------
-    // wait until we get a valid satellite lock:
+    // wait until we get a steady satellite lock:
     wait_for_gps(lcd);
 
     // ------------------------------------------------------------
-    // update the display with the clue for the target
-    // and the distance to it
+    // update the display with the clue for the target, the
+    // distance to it, and whether it is hotter or colder
     update_target_display(lcd);
 
 #endif

@@ -8,11 +8,11 @@
 
 A gift box, locked from the inside, that will only open at a special location that can be set by the giver. 
 
-When the button is pressed the box displays how far away they currently are, along with a clue about the destination. They must travel a few miles and check again to see if they are getting closer or further away from the destination!
+When the button is pressed the box displays how far away they currently are, along with a clue about the destination and whether they are hotter or colder than the last time they checked. They must travel a few miles and check again to see if they are getting closer or further away from the destination!
 
-The giver can set up to 8 locations that must be visited in order, each with its own clue of up to 32 characters. Clues longer than the 16 character display scroll across it.
+The giver can set up to 8 locations that must be visited in order, each with its own clue of up to 32 characters. Clues longer than the 16 character display scroll across it. With more than one location the box shows which one they are on ("Location 2 of 4"), and the giver can add a message of up to 32 characters that is shown when the box finally unlocks.
 
-When they finally arrive at the correct location the box unlocks to present any gifts inside, and a message is displayed!
+When they finally arrive at the correct location the box unlocks to present any gifts inside, and the giver's message is displayed!
 
 ![reverse geocache box](exampleImage.png)  
 [video](https://youtu.be/QjWmHyE3k_Q)

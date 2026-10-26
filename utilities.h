@@ -93,7 +93,15 @@ enum MagicNumber_t {
 
     DisplayTime = 7,            // time to display before turning off
 
-    GpsTimeout = 30000,         // timeout on no gps activity
+    GpsFixTimeout = 120,        // seconds to wait for a gps fix before giving up
+    GpsSettleTime = 5,          // seconds to let a new gps fix settle
+    MaxHdop = 200,              // gps fix is accurate enough at or below this
+                                // HDOP (in hundredths, so 2.0)
+
+    HotColdFeet = 100,          // smallest change in distance that counts as
+                                // hotter or colder
+
+    ProgressTime = 2,           // seconds to show "Location 2 of 4"
 
     ScrollStep = 350,           // ms between each step of a scrolling clue
     ScrollPause = 1500,         // ms to pause at each end of a scrolling clue
@@ -119,9 +127,10 @@ void clear_lcd(LiquidCrystal &lcd);
 void update_lcd(LiquidCrystal &lcd, char const *line1 = "", char const *line2 = "");
 void update_lcd_P(LiquidCrystal &lcd, char const *line1, char const *line2);
 void scroll_lcd(LiquidCrystal &lcd, char const *line1, char const *line2, unsigned long ms);
+void show_wrapped(LiquidCrystal &lcd, char const *text);
 void lcd_off(LiquidCrystal &lcd);
 void update_local_display(LiquidCrystal &lcd);
-void show_target(LiquidCrystal &lcd);
+void show_target(LiquidCrystal &lcd, double miles, char const *hint);
 void update_target_display(LiquidCrystal &lcd);
 void show_temp_volt(LiquidCrystal &lcd);
 void show_datetime(LiquidCrystal &lcd);
