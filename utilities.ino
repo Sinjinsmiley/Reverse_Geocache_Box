@@ -238,8 +238,7 @@ void target_success(LiquidCrystal_I2C &lcd) {
 
     config_data.save();
 
-    // play "success" music!
-    play_success();
+    smartDelay(DisplayTime * 1000);
 }
 
 
@@ -349,7 +348,7 @@ void update_target_display(LiquidCrystal_I2C &lcd) {
 
 // ----------------------------------------------------------------------
 // check for any special dates and times
-// play a tune and display a message for any
+// and display a message for any
 // 
 void check_dates(LiquidCrystal_I2C &lcd) {
     while (!gps.date.isValid()) 
@@ -372,8 +371,7 @@ void check_dates(LiquidCrystal_I2C &lcd) {
               //&& dt.get_seconds() == gps.time.second()
             ) {
                 update_lcd(lcd, msg[0], msg[1]);
-                play_success();
-                //smartDelay(DisplayTime * 1000);
+                smartDelay(DisplayTime * 1000);
             }
         }
     }
@@ -480,7 +478,6 @@ void check_secret(LiquidCrystal_I2C &lcd) {
     wait_for_gps(lcd);
 
     update_local_display(lcd);
-    play_success();
 
     turn_off(lcd);
 }
@@ -623,8 +620,6 @@ void test_all(LiquidCrystal_I2C &lcd) {
     }
 
     unlock_box();
-    
-    play_success();
 
     turn_off(lcd);
 

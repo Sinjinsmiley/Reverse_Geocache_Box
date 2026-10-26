@@ -76,12 +76,6 @@ extern    eeprom_data_t    config_data;
 enum MagicNumber_t {
     // Pin Assignments
     // Adjust per project as your build requires.
-    // 
-    // !! Also see Playtune_poll.h for the 8 output pins used for sound !!
-    // Current sound output pins:
-    // 5, 6, 7, 8, A0, 10, 11, 12
-    // Each sound output pin has a 500 ohm resistor to a common output
-    // which is fed into an amplifier and then to a speaker
 
     DbgLedPin  = LED_BUILTIN,   // debugging LED
     SecretPin1 = A1,            // hidden input pin attached to one hinge on the box lid
@@ -110,7 +104,6 @@ void smartDelay(unsigned long ms = 0);
 void init_serial();
 void init_gps();
 void wait_for_gps(LiquidCrystal_I2C &lcd);
-void play_success();
 void moveServo(uint8_t const pos);
 void lock_box();
 void unlock_box();

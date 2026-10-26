@@ -8,18 +8,15 @@
 |*| 
 |*| [+] Box only unlocks at a special location.
 |*| [+] Written for Arduino Nano but this will work with any other 
-|*|     Arduino except ATTiny due to pins. (would work w/o music)
+|*|     Arduino that has enough pins.
 |*| [+] Runs on 2 3.7V rechargeable lipo batteries
 |*| [+] 5V LDO (low drop-out) regulator circuit
 |*| [+] Uses solid state power button.  Turns itself off.  0.000A used when off.
 |*| [+] I2C LCD display
 |*| [+] 4800 baud serial GPS module
 |*| [+] Metal Gear Digital Servo controls the box lock mechanism
-|*| [+] Amplifier module and 2W speaker
-|*| [+] Plays any MIDI tune on success using the Playtune library and Miditones
-|*|     utility available at https://github.com/LenShustek/miditones.git
 |*| [+] Hidden easter egg to unlock or get into internal debugger/setup mode
-|*| [+] Displays messages and plays sounds on important dates.
+|*| [+] Displays messages on important dates.
 |*| [+] Up to 8 special dates/times with messages can be stored!
 |*| [+] Up to 8 sequential targets can be configured!
 |*| [+] All configurable target(s), important date(s) and messages, and
