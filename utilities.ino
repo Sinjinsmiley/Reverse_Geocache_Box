@@ -73,7 +73,7 @@ void gps_give_up(LiquidCrystal &lcd) {
 // see if the gps has sent a recent, believable date and time. Before the
 // gps module knows the time it sends empty fields, which TinyGPSPlus reads
 // as valid zeros (the year 2000, month 0).
-// 
+//
 bool gps_time_ok() {
     return gps.date.isValid() && gps.time.isValid()
         && gps.date.age() < GpsMaxAge && gps.time.age() < GpsMaxAge
@@ -88,7 +88,7 @@ bool gps_time_ok() {
 // wait for the gps to send the date and time. This only needs one
 // satellite so it works in places where a position fix might not.
 // Gives up and turns off after GpsFixTimeout seconds.
-// 
+//
 void wait_for_gps_time(LiquidCrystal &lcd) {
     if (gps_time_ok()) {
         return;
@@ -120,7 +120,7 @@ void wait_for_gps_time(LiquidCrystal &lcd) {
 // wait until we get a steady lock on the satellites, showing the number
 // of satellites and time waited. Gives up and turns off if there is no
 // fix after GpsFixTimeout seconds.
-// 
+//
 void wait_for_gps(LiquidCrystal &lcd) {
     // kept between calls so that we only wait for a steady fix once
     static bool          ready = false;
@@ -198,7 +198,7 @@ void wait_for_gps(LiquidCrystal &lcd) {
 // ----------------------------------------------------------------------
 // move the servo slowly from one position to another. If they are the
 // same it just holds that position.
-// 
+//
 void moveServo(ServoPos_t from, ServoPos_t to) {
     PWMServo servo;         // The servo that locks/unlocks the box
     servo.attach(SrvPin);   // start generating pwm on the pin as an output
@@ -219,7 +219,7 @@ void moveServo(ServoPos_t from, ServoPos_t to) {
 // ----------------------------------------------------------------------
 // the position the servo was last left in. The servo has no position
 // sensor, so this relies on the saved lock state.
-// 
+//
 ServoPos_t servo_position() {
     return config_data.isLocked() ? SrvClose : SrvOpen;
 
@@ -279,7 +279,7 @@ double get_distance(double latitude, double longitude) {
 // ----------------------------------------------------------------------
 // get the distance in miles from the current location to the current
 // target, rounded down to two decimal places
-// 
+//
 double get_target_miles() {
     double distanceMeters = get_distance(config_data.get_target_lat(0), config_data.get_target_lon(0));
     double distanceMiles = distanceMeters / 1000.0 * 0.6214;
@@ -324,7 +324,7 @@ void update_lcd_P(LiquidCrystal &lcd, char const *line1, char const *line2) {
 // show the two lines of text from SRAM for at least ms milliseconds.
 // If line1 is too long for the display it scrolls across the top line,
 // all the way through at least once.
-// 
+//
 void scroll_lcd(LiquidCrystal &lcd, char const *line1, char const *line2, unsigned long ms) {
     update_lcd(lcd, line1, line2);
 
@@ -354,7 +354,7 @@ void scroll_lcd(LiquidCrystal &lcd, char const *line1, char const *line2, unsign
 // ----------------------------------------------------------------------
 // show up to 32 chars of text over both lines, breaking
 // the line at a space where possible
-// 
+//
 void show_wrapped(LiquidCrystal &lcd, char const *text) {
     int const len = strlen(text);
     int brk = len;      // where line 1 ends
@@ -415,7 +415,7 @@ void update_local_display(LiquidCrystal &lcd) {
 // show the clue for the current target on the top line, scrolling if
 // needed, and the distance to it on the bottom line with the hint (from
 // PROGMEM) on the right. e.g. "3.42 mi   Hotter"
-// 
+//
 void show_target(LiquidCrystal &lcd, double miles, char const *hint) {
     char clue[MAX_CLUE_LEN + 1];
     config_data.get_clue(0, clue);
@@ -736,7 +736,7 @@ int day_of_week(int year, int month, int day) {
 
 // ----------------------------------------------------------------------
 // number of days in a month, 1 = January
-// 
+//
 int days_in_month(int year, int month) {
     static const uint8_t days[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
     bool const leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
@@ -749,7 +749,7 @@ int days_in_month(int year, int month) {
 // see if UK clocks are on BST for a date and hour in GMT. They go forward
 // at 01:00 GMT on the last Sunday in March and back at 01:00 GMT on the
 // last Sunday in October.
-// 
+//
 bool is_bst(int year, int month, int day, int hour) {
     if (month < 3 || month > 10) {
         return false;
@@ -769,7 +769,7 @@ bool is_bst(int year, int month, int day, int hour) {
 // ----------------------------------------------------------------------
 // get the UK time (GMT or BST) from the gps satellite time, which is in
 // GMT. tm_isdst is set when it is BST.
-// 
+//
 tm get_uk_time(LiquidCrystal &lcd) {
     wait_for_gps_time(lcd);
 
