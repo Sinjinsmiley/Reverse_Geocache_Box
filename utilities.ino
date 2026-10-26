@@ -553,17 +553,17 @@ void show_temp_volt(LiquidCrystal &lcd) {
 
 
 // ----------------------------------------------------------------------
-// show the current date and time
+// show the current UK date and time
 // used in clock mode
 // 
 void show_datetime(LiquidCrystal &lcd) {
     char line1[32], line2[32];
     static char const month[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-    tm dt = convert_cst(lcd, -6);
+    tm dt = get_uk_time(lcd);
 
-    sprintf(line1, "%s %d, %d", month[dt.tm_mon], dt.tm_mday, dt.tm_year + 1900);
-    sprintf(line2, "%02d:%02d:%02d", dt.tm_hour, dt.tm_min, dt.tm_sec);
+    sprintf(line1, "%d %s %d", dt.tm_mday, month[dt.tm_mon], dt.tm_year + 1900);
+    sprintf(line2, "%02d:%02d:%02d %s", dt.tm_hour, dt.tm_min, dt.tm_sec, dt.tm_isdst ? "BST" : "GMT");
     update_lcd(lcd, line1, line2);
 
 } // show_datetime
@@ -664,63 +664,92 @@ void check_developer_lock(LiquidCrystal &lcd) {
 
 
 // ----------------------------------------------------------------------
-// convert gps satellite time from gmt to some other time zone
+// day of the week for a date, 0 = Sunday (Sakamoto's method)
 // 
-tm convert_cst(LiquidCrystal &lcd, int gmt_offset) {
+int day_of_week(int year, int month, int day) {
+    static const uint8_t offsets[12] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+    if (month < 3) {
+        year--;
+    }
+    return (year + year / 4 - year / 100 + year / 400 + offsets[month - 1] + day) % 7;
+
+} // day_of_week
+
+
+// ----------------------------------------------------------------------
+// number of days in a month, 1 = January
+// 
+int days_in_month(int year, int month) {
+    static const uint8_t days[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    bool const leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    return (month == 2 && leap) ? 29 : days[month - 1];
+
+} // days_in_month
+
+
+// ----------------------------------------------------------------------
+// see if UK clocks are on BST for a date and hour in GMT. They go forward
+// at 01:00 GMT on the last Sunday in March and back at 01:00 GMT on the
+// last Sunday in October.
+// 
+bool is_bst(int year, int month, int day, int hour) {
+    if (month < 3 || month > 10) {
+        return false;
+    }
+    if (month > 3 && month < 10) {
+        return true;
+    }
+
+    int const last_sunday = 31 - day_of_week(year, month, 31);
+    bool const after_change = day > last_sunday || (day == last_sunday && hour >= 1);
+
+    return (month == 3) ? after_change : !after_change;
+
+} // is_bst
+
+
+// ----------------------------------------------------------------------
+// get the UK time (GMT or BST) from the gps satellite time, which is in
+// GMT. tm_isdst is set when it is BST.
+// 
+tm get_uk_time(LiquidCrystal &lcd) {
     wait_for_gps(lcd);
     while (!gps.date.isValid() || !gps.time.isValid()) {
         smartDelay();
+    }
+
+    int year = gps.date.year();
+    int month = gps.date.month();
+    int day = gps.date.day();
+    int hour = gps.time.hour();
+
+    bool const bst = is_bst(year, month, day, hour);
+
+    // BST is an hour ahead, which can move on to the next day. BST is
+    // never in effect on 31 December so the year never changes.
+    if (bst && ++hour == 24) {
+        hour = 0;
+        if (++day > days_in_month(year, month)) {
+            day = 1;
+            month++;
+        }
     }
 
     tm t; // std C time and date struct
 
     t.tm_sec = gps.time.second();
     t.tm_min = gps.time.minute();
-    t.tm_hour = gps.time.hour();
-    t.tm_mday = gps.date.day();
-    t.tm_mon = gps.date.month() - 1;
-    t.tm_year = gps.date.year() - 1900;
-    t.tm_wday = (t.tm_mday + 3) % 7;
+    t.tm_hour = hour;
+    t.tm_mday = day;
+    t.tm_mon = month - 1;
+    t.tm_year = year - 1900;
+    t.tm_wday = day_of_week(year, month, day);
     t.tm_yday = 0;
-    t.tm_isdst = 0;
-
-//    char *str_asc = asctime(&t);
-//    Serial.println(str_asc);
-
-    // convert from GMT to CST
-    t.tm_hour += gmt_offset;
-
-    if (t.tm_hour < 0) {
-        t.tm_hour += 24;
-        t.tm_mday--;
-
-        if (t.tm_mday <= 0) {
-            int feb = t.tm_year % 4 == 0 ? 29 : 28;
-            int days[12] = { 
-                31, feb,  31,  30, 
-                31,  30,  31,  31, 
-                30,  31,  30,  31 };
-            t.tm_mday = days[t.tm_mon];
-            t.tm_wday = (t.tm_mday + 1) % 7;
-            t.tm_mon--;
-            if (t.tm_mon < 0) {
-                t.tm_mon = 11;
-                t.tm_year--;
-            }
-        }
-
-        t.tm_wday--;
-        if (t.tm_wday < 0) {
-            t.tm_wday = 6;
-        }
-    }
-
-//    str_asc = asctime(&t);
-//    Serial.println(str_asc);
+    t.tm_isdst = bst;
 
     return t;
 
-} // convert_cst
+} // get_uk_time
 
 
 // ----------------------------------------------------------------------

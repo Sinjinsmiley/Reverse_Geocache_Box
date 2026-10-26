@@ -31,7 +31,7 @@
 |*| [+] Only modified values are updated in EEPROM - saves write cycles
 |*| [+] Displays battery voltage and cpu temperature using the ATMega328's
 |*|     internal ADC and diode!
-|*| [+] Clock mode
+|*| [+] Clock mode, showing UK time (GMT or BST)
 |*| [+] Menu system
 |*| 
 |*| TODO:

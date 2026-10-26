@@ -137,7 +137,10 @@ void show_temp_volt(LiquidCrystal &lcd);
 void show_datetime(LiquidCrystal &lcd);
 void check_secret(LiquidCrystal &lcd);
 void check_developer_lock(LiquidCrystal &lcd);
-tm convert_cst(LiquidCrystal &lcd, int gmt_offset);
+int day_of_week(int year, int month, int day);
+int days_in_month(int year, int month);
+bool is_bst(int year, int month, int day, int hour);
+tm get_uk_time(LiquidCrystal &lcd);
 void test_all(LiquidCrystal &lcd);
 
 #endif // UTILITIES_H
