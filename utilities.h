@@ -95,6 +95,7 @@ enum MagicNumber_t {
 
     GpsFixTimeout = 120,        // seconds to wait for a gps fix before giving up
     GpsSettleTime = 5,          // seconds to let a new gps fix settle
+    GpsMaxAge = 2000,           // ms before a gps location is too old to use
     MaxHdop = 200,              // gps fix is accurate enough at or below this
                                 // HDOP (in hundredths, so 2.0)
 

@@ -67,13 +67,25 @@ void wait_for_gps(LiquidCrystal &lcd) {
         unsigned long const elapsed = millis() - start;
         bool const timed_out = elapsed >= GpsFixTimeout * 1000UL;
 
-        if (gps.location.isValid()) {
+        // TinyGPSPlus keeps the last location (and isValid() stays true)
+        // after the signal is lost, so only count a recent one
+        bool const fresh = gps.location.isValid() && gps.location.age() < GpsMaxAge;
+
+        if (!fresh) {
+            // lost the fix, so a new one has to settle again
+            have_fix = false;
+        }
+
+        if (fresh) {
             if (!have_fix) {
                 have_fix = true;
                 fix_time = millis();
             }
 
-            bool const accurate = gps.hdop.isValid() && gps.hdop.value() <= MaxHdop;
+            // the hdop is updated even without a fix and an empty value
+            // reads as 0, so 0 means unknown rather than perfect
+            int32_t const hdop = gps.hdop.isValid() ? gps.hdop.value() : 0;
+            bool const accurate = hdop > 0 && hdop <= MaxHdop;
             bool const settled = millis() - fix_time >= GpsSettleTime * 1000UL;
 
             // use the fix once it is accurate and has settled, or use
