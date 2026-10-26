@@ -23,8 +23,6 @@
 #include <time.h>
 
 #include "eeprom_data.h"
-#include "utilities.h"
-#include "menu.h"
 
 // ======================================================================
 // Manifest Constants to Control Compile-Time Options
@@ -75,7 +73,6 @@ enum MagicNumber_t {
     // Pin Assignments
     // Adjust per project as your build requires.
 
-    DbgLedPin  = LED_BUILTIN,   // debugging LED
     SecretPin1 = A1,            // hidden input pin attached to one hinge on the box lid
     SecretPin2 = A2,            // hidden output pin attached to the other hinge on the box lid
     SrvPin     = SERVO_PIN_A,   // pin 9 from PWMServo.h
@@ -108,6 +105,8 @@ enum MagicNumber_t {
 
     ScrollStep = 350,           // ms between each step of a scrolling clue
     ScrollPause = 1500,         // ms to pause at each end of a scrolling clue
+
+    SrvSettleTime = 300,        // ms to let the servo reach its position
 };
 
 enum ServoPos_t {
@@ -123,13 +122,13 @@ void gps_give_up(LiquidCrystal &lcd);
 bool gps_time_ok();
 void wait_for_gps_time(LiquidCrystal &lcd);
 void wait_for_gps(LiquidCrystal &lcd);
-void moveServo(uint8_t const pos);
+void moveServo(ServoPos_t from, ServoPos_t to);
+ServoPos_t servo_position();
 void lock_box();
 void unlock_box();
 void turn_off(LiquidCrystal &lcd);
 double get_distance(double latitude, double longitude);
 double get_target_miles();
-void clear_lcd(LiquidCrystal &lcd);
 void update_lcd(LiquidCrystal &lcd, char const *line1 = "", char const *line2 = "");
 void update_lcd_P(LiquidCrystal &lcd, char const *line1, char const *line2);
 void scroll_lcd(LiquidCrystal &lcd, char const *line1, char const *line2, unsigned long ms);

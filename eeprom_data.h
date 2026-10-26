@@ -25,10 +25,9 @@ private:
     // changed whenever the layout of the data changes so that
     // older data is reset instead of being read incorrectly
     static const 
-    uint8_t Signature {0xA7};
+    uint8_t Signature {0xA8};
 
     uint8_t signature {0};
-    uint8_t dirty {0};
     uint8_t locked {0};
     uint8_t total_targets {0};      // number of targets when the box was programmed
     double  last_miles {0.0};       // distance at the last check, 0 if none yet
@@ -48,7 +47,6 @@ public:
     {
         *this = eeprom_data_t();
         signature = Signature;
-        dirty = true;
 
         for (int num = 0; num < MAX_TARGETS; ++num) {
             set_clue(num, "");
@@ -61,11 +59,6 @@ public:
         return Signature == signature;
     }
 
-    bool isDirty() const
-    {
-        return dirty;
-    }
-
     bool isLocked() const
     {
         return locked;
@@ -73,18 +66,12 @@ public:
 
     void setLocked()
     {
-        if (!locked) {
-            locked = true;
-            dirty = true;
-        }
+        locked = true;
     }
 
     void setUnlocked()
     {
-        if (locked) {
-            locked = false;
-            dirty = true;
-        }
+        locked = false;
     }
 
     // ----------------------------------------------------------------------
@@ -106,7 +93,6 @@ public:
         if (num >= count)
             return false;
 
-        dirty = true;
         char clue[MAX_CLUE_LEN + 1];
         for (; num < count - 1; num++) {
             targets[num] = targets[num + 1];
@@ -130,7 +116,6 @@ public:
     void set_total_targets()
     {
         total_targets = get_num_targets();
-        dirty = true;
     }
 
     int get_total_targets() const
@@ -148,10 +133,7 @@ public:
 
     void set_last_miles(double const miles)
     {
-        if (last_miles != miles) {
-            last_miles = miles;
-            dirty = true;
-        }
+        last_miles = miles;
     }
 
     double get_target_lat(int cur=0) const
@@ -161,10 +143,7 @@ public:
     
     void set_target_lat(double const latitude, int cur)
     {
-        if (targets[cur].lat != latitude) {
-            targets[cur].lat = latitude;
-            dirty = true;
-        }
+        targets[cur].lat = latitude;
     }
 
     double get_target_lon(int cur = 0) const
@@ -174,10 +153,7 @@ public:
     
     void set_target_lon(double const longitude, int cur)
     {
-        if (targets[cur].lon != longitude) {
-            targets[cur].lon = longitude;
-            dirty = true;
-        }
+        targets[cur].lon = longitude;
     }
 
     // ----------------------------------------------------------------------
@@ -247,17 +223,14 @@ public:
             save();
         }
 
-        dirty = false;
-
         return isValid();
     }
 
+    // EEPROM.put() only writes the bytes that have changed,
+    // so saving often doesn't wear out the EEPROM
     void save()
     {
-//        if (dirty) {
-            dirty = false;
-            EEPROM.put(0, *this);
-//        }
+        EEPROM.put(0, *this);
     }
 
 };

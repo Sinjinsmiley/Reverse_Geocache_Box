@@ -196,41 +196,41 @@ void wait_for_gps(LiquidCrystal &lcd) {
 
 
 // ----------------------------------------------------------------------
-// Move the servo to a specified position
-void moveServo(ServoPos_t pos) {
+// move the servo slowly from one position to another. If they are the
+// same it just holds that position.
+// 
+void moveServo(ServoPos_t from, ServoPos_t to) {
     PWMServo servo;         // The servo that locks/unlocks the box
     servo.attach(SrvPin);   // start generating pwm on the pin as an output
-    int delta = 0;
 
-    switch (pos) {
-        case SrvClose:  // SrvClose := 60
-            delta = (SrvOpen > SrvClose) ? -1 : +1;
-            for (unsigned newpos = SrvOpen; newpos != SrvClose; newpos += delta) {
-                servo.write(newpos);
-                smartDelay(16);
-            }
-            break;
-
-        case SrvOpen:   // SrvOpen := 110
-            delta = (SrvOpen > SrvClose) ? +1 : -1;
-            for (unsigned newpos = SrvClose; newpos != SrvOpen; newpos += delta) {
-                servo.write(newpos);
-                smartDelay(16);
-            }
-            break;
+    int const step = (to > from) ? +1 : -1;
+    for (int pos = from; pos != to; pos += step) {
+        servo.write(pos);
+        smartDelay(16);
     }
+    servo.write(to);
 
-    smartDelay(100);
+    smartDelay(SrvSettleTime);
     servo.detach();         // set the pin as high-z input and stop generating pwm
 
 } // moveServo
 
 
 // ----------------------------------------------------------------------
-// lock the bax
+// the position the servo was last left in. The servo has no position
+// sensor, so this relies on the saved lock state.
+// 
+ServoPos_t servo_position() {
+    return config_data.isLocked() ? SrvClose : SrvOpen;
+
+} // servo_position
+
+
+// ----------------------------------------------------------------------
+// lock the box
 // 
 void lock_box() {
-    moveServo(SrvClose);
+    moveServo(servo_position(), SrvClose);
     config_data.setLocked();
 
 } // lock_box
@@ -240,7 +240,7 @@ void lock_box() {
 // unlock the box
 // 
 void unlock_box() {
-    moveServo(SrvOpen);
+    moveServo(servo_position(), SrvOpen);
     config_data.setUnlocked();
 
 } // unlock_box
@@ -397,9 +397,6 @@ void lcd_off(LiquidCrystal &lcd) {
 // display the current latitude and longitude. for debugging/testing
 // 
 void update_local_display(LiquidCrystal &lcd) {
-//    double next_lat = config_data.get_target_lat(0);
-//    double next_lon = config_data.get_target_lon(0);
-
     double cur_lat = gps.location.lat();
     double cur_lon = gps.location.lng();
 
@@ -599,7 +596,7 @@ void show_temp_volt(LiquidCrystal &lcd) {
     double temp = temperature();
 
     // Convert to fahrenheit if desired:
-    temp = bCelcius ? temp : (temp * 2.0) + 30.0;
+    temp = bCelcius ? temp : (temp * 1.8) + 32.0;
 
     // Format string of 6 total digits (incl '.') with 2 decimal place
     dtostrf(temp, 6, 2, buf);
@@ -629,7 +626,6 @@ void show_datetime(LiquidCrystal &lcd) {
 
 // ----------------------------------------------------------------------
 // check for the secret backdoor to open the box
-// and access any special menus or features
 // 
 void check_secret(LiquidCrystal &lcd) {
     // set up one pin as an INPUT that defaults to HIGH. set up the other pin as an OUTPUT:
@@ -721,8 +717,6 @@ void check_developer_lock(LiquidCrystal &lcd) {
     }
 
     lock_box();
-
-    config_data.setLocked();
     config_data.save();
 }
 

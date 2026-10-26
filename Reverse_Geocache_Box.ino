@@ -32,7 +32,6 @@
 |*| [+] Displays battery voltage and cpu temperature using the ATMega328's
 |*|     internal ADC and diode!
 |*| [+] Clock mode, showing UK time (GMT or BST)
-|*| [+] Menu system
 |*| 
 |*| TODO:
 |*| [ ] give the user a direction heading
@@ -62,13 +61,20 @@ eeprom_data_t    config_data;
 #warning compiling for PROGRAM_EEPROM.
 
 // ----------------------------------------------------------------------
-// write new target(s), clue(s), and the unlock message to the EEPROM,
-// unlock the box so the gift can be put inside, and show the clue and
+// unlock the box so the gift can be put inside, write new target(s),
+// clue(s), and the unlock message to the EEPROM, and show the clue and
 // distance for the first target. Never returns.
 //
 void program_box(LiquidCrystal &lcd)
 {
-    // start from blank data, replacing any old target(s), clue(s), and message
+    // open the box so the gift can be put inside. Load the saved lock
+    // state first so the servo moves smoothly from where it was left.
+    config_data.load();
+    unlock_box();
+
+    // start from blank data, replacing any old target(s), clue(s), and
+    // message. This leaves it marked as unlocked so the next normal power
+    // on runs the locking countdown.
     config_data.init();
 
     // Set at least one target, up to MAX_TARGETS, each with a clue of up
@@ -86,10 +92,6 @@ void program_box(LiquidCrystal &lcd)
     // characters over the two lines. Leave it empty for no message.
     config_data.set_unlock_message("Happy birthday! Enjoy your gift");
 
-    // open the box and leave it marked as unlocked so the
-    // next normal power on runs the locking countdown
-    unlock_box();
-
     config_data.save();
 
     // wait until we get a valid satellite lock:
@@ -97,7 +99,7 @@ void program_box(LiquidCrystal &lcd)
 
     // show how many targets were saved, then the first clue and distance
     char line1[32] = "";
-    static char const fmtP[] PROGMEM = "Saved %d targets";
+    static char const fmtP[] PROGMEM = "Targets saved: %d";
     char fmt[20];
     strcpy_P(fmt, fmtP);
     sprintf(line1, fmt, config_data.get_num_targets());
