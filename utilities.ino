@@ -141,6 +141,19 @@ double get_distance(double latitude, double longitude) {
 
 
 // ----------------------------------------------------------------------
+// get the distance in miles from the current location to the current
+// target, rounded down to two decimal places
+// 
+double get_target_miles() {
+    double distanceMeters = get_distance(config_data.get_target_lat(0), config_data.get_target_lon(0));
+    double distanceMiles = distanceMeters / 1000.0 * 0.6214;
+
+    return double(uint32_t(distanceMiles * 100)) / 100.0;
+
+} // get_target_miles
+
+
+// ----------------------------------------------------------------------
 // update the lcd display with the two lines of text from SRAM
 // 
 void update_lcd(LiquidCrystal &lcd, char const *line1/* = "" */, char const *line2/* = "" */) {
@@ -169,6 +182,37 @@ void update_lcd_P(LiquidCrystal &lcd, char const *line1, char const *line2) {
     update_lcd(lcd, data1, data2);
 
 } // update_lcd_P
+
+
+// ----------------------------------------------------------------------
+// show the two lines of text from SRAM for at least ms milliseconds.
+// If line1 is too long for the display it scrolls across the top line,
+// all the way through at least once.
+// 
+void scroll_lcd(LiquidCrystal &lcd, char const *line1, char const *line2, unsigned long ms) {
+    update_lcd(lcd, line1, line2);
+
+    int const extra = int(strlen(line1)) - 16;
+    if (extra <= 0) {
+        smartDelay(ms);
+        return;
+    }
+
+    unsigned long const start = millis();
+    do {
+        for (int pos = 0; pos <= extra; ++pos) {
+            char window[17];
+            strncpy(window, line1 + pos, 16);
+            window[16] = '\0';
+            lcd.setCursor(0, 0);
+            lcd.print(window);
+
+            // pause at each end so the start and end are easy to read
+            smartDelay((pos == 0 || pos == extra) ? ScrollPause : ScrollStep);
+        }
+    } while (millis() - start < ms);
+
+} // scroll_lcd
 
 
 // ----------------------------------------------------------------------
@@ -216,6 +260,24 @@ void update_local_display(LiquidCrystal &lcd) {
 
 
 // ----------------------------------------------------------------------
+// show the clue for the current target on the top line, scrolling
+// if needed, and the distance to it on the bottom line
+// 
+void show_target(LiquidCrystal &lcd) {
+    char clue[MAX_CLUE_LEN + 1];
+    config_data.get_clue(0, clue);
+
+    char line2[32];
+    dtostrf(get_target_miles(), 7, 2, line2);
+    static char const miles[] PROGMEM = " miles.";
+    strcat_P(line2, miles);
+
+    scroll_lcd(lcd, clue, line2, DisplayTime * 1000);
+
+} // show_target
+
+
+// ----------------------------------------------------------------------
 // Handle arriving at our next target location!
 // 
 void target_success(LiquidCrystal &lcd) {
@@ -239,13 +301,17 @@ void target_success(LiquidCrystal &lcd) {
     config_data.save();
 
     smartDelay(DisplayTime * 1000);
+
+    // show where to go next
+    if (config_data.get_num_targets() > 0) {
+        show_target(lcd);
+    }
 }
 
 
 // ----------------------------------------------------------------------
-// update the display with the distance to the target and number of tries
-// remaining. Handles arriving at target(s), reducing the number of tries,
-// and possibly unlocking the box and play a song.
+// update the display with the clue for the target and the distance to
+// it. Handles arriving at target(s) and possibly unlocking the box.
 // 
 void update_target_display(LiquidCrystal &lcd) {
 
@@ -253,26 +319,6 @@ void update_target_display(LiquidCrystal &lcd) {
     if (config_data.get_num_targets() == 0) {
         // we have unlocked all of the targets.
         show_datetime(lcd);
-        smartDelay(DisplayTime * 1000);
-        turn_off(lcd);
-
-        return;
-    }
-
-    // See if we are out of tries
-    int tries = config_data.get_num_tries();
-    if (tries == 0) {
-        static const char line1[] PROGMEM = "  You are out";
-        static const char line2[] PROGMEM = "   of tries!";
-        update_lcd_P(lcd, line1, line2);
-
-        // *make the user wait or something to default things again (*not included here)
-
-        // we just reset things here by default so there is no penalty
-        config_data.init();
-        config_data.set_default_tries(DefaultTries);
-        config_data.save();
-
         smartDelay(DisplayTime * 1000);
         turn_off(lcd);
 
@@ -296,50 +342,14 @@ void update_target_display(LiquidCrystal &lcd) {
 
     // We have GPS now so our location, date, and time are correct
 
-    double target_lat = config_data.get_target_lat(0);
-    double target_lon = config_data.get_target_lon(0);
-
-    double distanceMeters = get_distance(target_lat, target_lon);
-    double distanceKm = distanceMeters / 1000.0;
-    double distanceMiles = distanceKm * 0.6214;
-
-    // round off to two decimal places
-    distanceMiles = double(uint32_t(distanceMiles * 100)) / 100.0;
-
-    if (distanceMiles <= 0.01) {
+    if (get_target_miles() <= 0.01) {
         target_success(lcd);
         turn_off(lcd);
 
         return;
     }
 
-    config_data.reduce_tries();
-
-#if defined(DEVELOPER_MODE)
-#warning compiling for DEVELOPER_MODE.
-#else
-
-    config_data.save();
-
-#endif
-
-    char line1[32] = "", line2[32] = "";
-    char buf[32];
-
-    dtostrf(distanceMiles, 7, 2, buf);
-    strcpy(line1, buf);
-    static char const miles[] PROGMEM = " miles.";
-    strcat_P(line1, miles);
-
-    static char const fmtP[] PROGMEM = "%d tries left.";
-    char fmt[16];
-    strcpy_P(fmt, fmtP);
-    sprintf(buf, fmt, tries);
-    strcpy(line2, buf);
-
-    update_lcd(lcd, line1, line2);
-
-    smartDelay(DisplayTime * 1000);
+    show_target(lcd);
 
     turn_off(lcd);
 
@@ -456,6 +466,7 @@ void check_secret(LiquidCrystal &lcd) {
 // 
 void check_developer_lock(LiquidCrystal &lcd) {
 #if defined(DEVELOPER_MODE)
+#warning compiling for DEVELOPER_MODE.
     static char const line1[] PROGMEM = "  Lock Stopped  ";
     static char const line2[] PROGMEM = " DEVELOPER_MODE ";
     update_lcd_P(lcd, line1, line2);

@@ -8,7 +8,9 @@
 
 A gift box, locked from the inside, that will only open at a special location that can be set by the giver. 
 
-When the button is pressed the box displays how far away they currently are. They must travel a few miles and check again to see if they are getting closer or further away from the destination! The receiver of the box only has so many tries to triangulate in on the special location.
+When the button is pressed the box displays how far away they currently are, along with a clue about the destination. They must travel a few miles and check again to see if they are getting closer or further away from the destination!
+
+The giver can set up to 8 locations that must be visited in order, each with its own clue of up to 32 characters. Clues longer than the 16 character display scroll across it.
 
 When they finally arrive at the correct location the box unlocks to present any gifts inside, and a message is displayed!
 

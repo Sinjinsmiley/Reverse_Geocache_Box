@@ -17,8 +17,9 @@
 |*| [+] Metal Gear Digital Servo controls the box lock mechanism
 |*| [+] Hidden easter egg to unlock or get into internal debugger/setup mode
 |*| [+] Up to 8 sequential targets can be configured!
-|*| [+] All configurable target(s) and remaining tries are stored
-|*|     in EEPROM.
+|*| [+] Each target has a clue of up to 32 characters that is shown
+|*|     (scrolling if needed) along with the distance to it.
+|*| [+] All configurable target(s) and clue(s) are stored in EEPROM.
 |*| [+] Detects if EEPROM has never been programmed and automatically
 |*|     updates it the first time if needed.
 |*| [+] Only modified values are updated in EEPROM - saves write cycles
@@ -55,24 +56,22 @@ eeprom_data_t    config_data;
 #warning compiling for PROGRAM_EEPROM.
 
 // ----------------------------------------------------------------------
-// write new target(s) and number of tries to the EEPROM,
-// unlock the box so the gift can be put inside, and show the distance
-// to the first target without using up a try. Never returns.
+// write new target(s) and clue(s) to the EEPROM, unlock the box so
+// the gift can be put inside, and show the clue and distance for the
+// first target. Never returns.
 //
 void program_box(LiquidCrystal &lcd)
 {
-    // config_data has not been loaded from the EEPROM so it starts out
-    // blank, and saving it replaces any old target(s).
-
-    // set the number of tries before init() copies it into the remaining tries
-    config_data.set_default_tries(DefaultTries);
+    // start from blank data, replacing any old target(s) and clue(s)
     config_data.init();
 
-    // Set at least one target, up to MAX_TARGETS. Targets must be
-    // reached in order: 0, 1, 2, ...
+    // Set at least one target, up to MAX_TARGETS, each with a clue of up
+    // to MAX_CLUE_LEN characters. Clues longer than 16 characters scroll
+    // across the display. Targets must be reached in order: 0, 1, 2, ...
     static const double LONDON_LAT = 51.509865, LONDON_LON = -0.118092;
     config_data.set_target_lat(LONDON_LAT, 0);
     config_data.set_target_lon(LONDON_LON, 0);
+    config_data.set_clue(0, "Mind the gap near the Thames");
 
     // open the box and leave it marked as unlocked so the
     // next normal power on runs the locking countdown
@@ -83,22 +82,16 @@ void program_box(LiquidCrystal &lcd)
     // wait until we get a valid satellite lock:
     wait_for_gps(lcd);
 
-    // show what was saved and how far away the first target is
-    double distanceMiles = get_distance(
-        config_data.get_target_lat(0), config_data.get_target_lon(0)) / 1000.0 * 0.6214;
-
-    char line1[32] = "", line2[32] = "";
-    static char const fmtP[] PROGMEM = "%d tgt %d tries";
-    char fmt[16];
+    // show how many targets were saved, then the first clue and distance
+    char line1[32] = "";
+    static char const fmtP[] PROGMEM = "Saved %d targets";
+    char fmt[20];
     strcpy_P(fmt, fmtP);
-    sprintf(line1, fmt, config_data.get_num_targets(), config_data.get_num_tries());
+    sprintf(line1, fmt, config_data.get_num_targets());
+    update_lcd(lcd, line1);
+    smartDelay(2000);
 
-    dtostrf(distanceMiles, 7, 2, line2);
-    static char const miles[] PROGMEM = " mi away";
-    strcat_P(line2, miles);
-
-    update_lcd(lcd, line1, line2);
-    smartDelay(DisplayTime * 1000);
+    show_target(lcd);
 
     // remind the developer to turn this mode off, otherwise every
     // power on erases any progress and unlocks the box again
@@ -133,8 +126,8 @@ void setup()
 
     // ------------------------------------------------------------
     // enable PROGRAM_EEPROM in utilities.h and run once to update the
-    // EEPROM with the target(s) and number of tries that
-    // are set in program_box() above
+    // EEPROM with the target(s) and clue(s) that are set
+    // in program_box() above
 #if defined(PROGRAM_EEPROM)
     program_box(lcd);
 #endif
@@ -168,8 +161,8 @@ void setup()
     wait_for_gps(lcd);
 
     // ------------------------------------------------------------
-    // update the display with the target distance
-    // and reduce the number of remaining tries
+    // update the display with the clue for the target
+    // and the distance to it
     update_target_display(lcd);
 
 #endif

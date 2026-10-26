@@ -14,18 +14,20 @@
 // Redefine as needed (and memory allows)
 #define   MAX_TARGETS    8
 
+// Redefine as needed (and EEPROM size allows)
+#define   MAX_CLUE_LEN   32
+
 // The persistent values in EEPROM
 class eeprom_data_t 
 {
 private:
+    // changed whenever the layout of the data changes so that
+    // older data is reset instead of being read incorrectly
     static const 
-    uint8_t Signature {0xA5};
-
-    uint8_t DefaultTries {50};
+    uint8_t Signature {0xA6};
 
     uint8_t signature {0};
     uint8_t dirty {0};
-    uint8_t tries {0};
     uint8_t locked {0};
     struct {
         double      lat {0.0};
@@ -38,11 +40,16 @@ public:
     {
     }
     
+    // reset to blank data with no targets or clues
     void init()
     {
+        *this = eeprom_data_t();
         signature = Signature;
-        tries = DefaultTries;
         dirty = true;
+
+        for (int num = 0; num < MAX_TARGETS; ++num) {
+            set_clue(num, "");
+        }
     }
 
     bool isValid() const
@@ -91,17 +98,22 @@ public:
     }
 
     bool remove_target(int num) {
-        if (num >= get_num_targets())
+        int const count = get_num_targets();
+        if (num >= count)
             return false;
 
         dirty = true;
-        for (; num < get_num_targets()-1; num++) {
+        char clue[MAX_CLUE_LEN + 1];
+        for (; num < count - 1; num++) {
             targets[num] = targets[num + 1];
+            get_clue(num + 1, clue);
+            set_clue(num, clue);
         }
 
         for (; num < int(ARRAYSZ(targets)); ++num) {
             targets[num].lat = 0.0;
             targets[num].lon = 0.0;
+            set_clue(num, "");
         }
         
         return true;
@@ -134,40 +146,37 @@ public:
     }
 
     // ----------------------------------------------------------------------
-    // Number of Tries:
+    // Clues
+    // The clues are kept in the EEPROM just after the rest of this data
+    // and are only read when needed so they don't take up any SRAM.
+    // Unlike the rest of the data they are written right away.
 
-    uint8_t get_default_tries() const
+    static int clue_address(int num)
     {
-        return DefaultTries;
+        return sizeof(eeprom_data_t) + num * (MAX_CLUE_LEN + 1);
     }
 
-    void set_default_tries(uint8_t t)
+    // copy the clue for a target into buf, which must hold MAX_CLUE_LEN + 1 chars
+    void get_clue(int num, char buf[]) const
     {
-        DefaultTries = t;
-    }
-
-    uint16_t get_num_tries() const
-    {
-        return tries;
-    }
-
-    void set_tries(uint16_t const t)
-    {
-        if (tries != t) {
-            tries = t;
-            dirty = true;
+        int const addr = clue_address(num);
+        for (int i = 0; i < MAX_CLUE_LEN; ++i) {
+            buf[i] = EEPROM.read(addr + i);
+            if (buf[i] == '\0')
+                break;
         }
+        buf[MAX_CLUE_LEN] = '\0';
     }
 
-    uint16_t reduce_tries()
+    // set the clue for a target. Longer clues are cut to MAX_CLUE_LEN chars.
+    void set_clue(int num, char const *clue)
     {
-        if (tries > 0)
-        {
-            dirty = true;
-            return --tries;
+        int const addr = clue_address(num);
+        int i = 0;
+        for (; i < MAX_CLUE_LEN && clue[i] != '\0'; ++i) {
+            EEPROM.update(addr + i, clue[i]);
         }
-
-        return 0;
+        EEPROM.update(addr + i, '\0');
     }
 
     // ----------------------------------------------------------------------

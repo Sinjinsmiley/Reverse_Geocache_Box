@@ -37,14 +37,14 @@
 // Disable if not needed for production.
 
 // DEVELOPER_MODE
-// This disables writing to the EEPROM on every attempt
+// This disables locking the box
 
 // SELF_TEST
 // This runs a set of routines to exercise all of the various
 // subsystems in the project for testing and debugging.
 
 // PROGRAM_EEPROM
-// This writes the target(s) and number of tries
+// This writes the target(s) and clue(s)
 // set in program_box() (Reverse_Geocache_Box.ino) to the EEPROM,
 // unlocks the box, and then halts. Upload with this enabled, power
 // the box on once, then disable it and upload again.
@@ -60,7 +60,7 @@
 // uncomment to enable SELF_TEST mode
 //#define SELF_TEST
 
-// uncomment to program the EEPROM with new target(s)
+// uncomment to program the EEPROM with new target(s) and clue(s)
 //#define PROGRAM_EEPROM
 
 // external global variables
@@ -91,11 +91,12 @@ enum MagicNumber_t {
     LcdD6Pin   = 7,             // LCD data bit 6
     LcdD7Pin   = 8,             // LCD data bit 7
 
-    DefaultTries = 50,          // Default number of remaining tries
-
     DisplayTime = 7,            // time to display before turning off
 
     GpsTimeout = 30000,         // timeout on no gps activity
+
+    ScrollStep = 350,           // ms between each step of a scrolling clue
+    ScrollPause = 1500,         // ms to pause at each end of a scrolling clue
 };
 
 enum ServoPos_t {
@@ -113,11 +114,14 @@ void lock_box();
 void unlock_box();
 void turn_off(LiquidCrystal &lcd);
 double get_distance(double latitude, double longitude);
+double get_target_miles();
 void clear_lcd(LiquidCrystal &lcd);
 void update_lcd(LiquidCrystal &lcd, char const *line1 = "", char const *line2 = "");
 void update_lcd_P(LiquidCrystal &lcd, char const *line1, char const *line2);
+void scroll_lcd(LiquidCrystal &lcd, char const *line1, char const *line2, unsigned long ms);
 void lcd_off(LiquidCrystal &lcd);
 void update_local_display(LiquidCrystal &lcd);
+void show_target(LiquidCrystal &lcd);
 void update_target_display(LiquidCrystal &lcd);
 void show_temp_volt(LiquidCrystal &lcd);
 void show_datetime(LiquidCrystal &lcd);
