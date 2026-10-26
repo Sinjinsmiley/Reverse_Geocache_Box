@@ -13,7 +13,7 @@
 
 #define   ARRAYSZ(A)    (sizeof(A)/sizeof(*(A)))
 
-#include <LiquidCrystal_I2C.h>
+#include <LiquidCrystal.h>
 #include <SoftwareSerial.h>
 #include <avr/pgmspace.h>
 #include <TinyGPSPlus.h>
@@ -21,7 +21,6 @@
 #include <CPUVolt.h>
 #include <CPUTemp.h>
 #include <time.h>
-#include <Wire.h>
 
 #include "eeprom_data.h"
 #include "utilities.h"
@@ -85,9 +84,15 @@ enum MagicNumber_t {
     TXPin      = 3,             // transmit to GPS module
     PwrPin     = 2,             // raise HIGH to power off
 
-    DefaultTries = 50,          // Default number of remaining tries
+    // LCD display pins (4-bit parallel mode)
+    LcdRSPin   = 12,            // LCD register select
+    LcdEnPin   = 11,            // LCD enable
+    LcdD4Pin   = 5,             // LCD data bit 4
+    LcdD5Pin   = 6,             // LCD data bit 5
+    LcdD6Pin   = 7,             // LCD data bit 6
+    LcdD7Pin   = 8,             // LCD data bit 7
 
-    I2C_Disp_Addr = 0x27,       // I2C address of LCD display
+    DefaultTries = 50,          // Default number of remaining tries
 
     DisplayTime = 7,            // time to display before turning off
 
@@ -103,24 +108,24 @@ enum ServoPos_t {
 void smartDelay(unsigned long ms = 0);
 void init_serial();
 void init_gps();
-void wait_for_gps(LiquidCrystal_I2C &lcd);
+void wait_for_gps(LiquidCrystal &lcd);
 void moveServo(uint8_t const pos);
 void lock_box();
 void unlock_box();
-void turn_off(LiquidCrystal_I2C &lcd);
+void turn_off(LiquidCrystal &lcd);
 double get_distance(double latitude, double longitude);
-void clear_lcd(LiquidCrystal_I2C &lcd);
-void update_lcd(LiquidCrystal_I2C &lcd, char const *line1 = "", char const *line2 = "");
-void update_lcd_P(LiquidCrystal_I2C &lcd, char const *line1, char const *line2);
-void lcd_off(LiquidCrystal_I2C &lcd);
-void update_local_display(LiquidCrystal_I2C &lcd);
-void update_target_display(LiquidCrystal_I2C &lcd);
-void check_dates(LiquidCrystal_I2C &lcd);
-void show_temp_volt(LiquidCrystal_I2C &lcd);
-void show_datetime(LiquidCrystal_I2C &lcd);
-void check_secret(LiquidCrystal_I2C &lcd);
-void check_developer_lock(LiquidCrystal_I2C &lcd);
-tm convert_cst(LiquidCrystal_I2C &lcd, int gmt_offset);
-void test_all(LiquidCrystal_I2C &lcd);
+void clear_lcd(LiquidCrystal &lcd);
+void update_lcd(LiquidCrystal &lcd, char const *line1 = "", char const *line2 = "");
+void update_lcd_P(LiquidCrystal &lcd, char const *line1, char const *line2);
+void lcd_off(LiquidCrystal &lcd);
+void update_local_display(LiquidCrystal &lcd);
+void update_target_display(LiquidCrystal &lcd);
+void check_dates(LiquidCrystal &lcd);
+void show_temp_volt(LiquidCrystal &lcd);
+void show_datetime(LiquidCrystal &lcd);
+void check_secret(LiquidCrystal &lcd);
+void check_developer_lock(LiquidCrystal &lcd);
+tm convert_cst(LiquidCrystal &lcd, int gmt_offset);
+void test_all(LiquidCrystal &lcd);
 
 #endif // UTILITIES_H

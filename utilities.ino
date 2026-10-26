@@ -47,7 +47,7 @@ void init_gps() {
 // ----------------------------------------------------------------------
 // Show the initial display text until we get a lock on a satelite:
 // 
-void wait_for_gps(LiquidCrystal_I2C &lcd) {
+void wait_for_gps(LiquidCrystal &lcd) {
     static const char line1[] PROGMEM = "Waiting on GPS..";
     static const char line2[] PROGMEM = "";
     update_lcd_P(lcd, line1, line2);
@@ -113,7 +113,7 @@ void unlock_box() {
 // ----------------------------------------------------------------------
 // turn the box off
 // 
-void turn_off(LiquidCrystal_I2C &lcd) {
+void turn_off(LiquidCrystal &lcd) {
     lcd_off(lcd);
     pinMode(PwrPin, OUTPUT);
     digitalWrite(PwrPin, HIGH);
@@ -143,7 +143,7 @@ double get_distance(double latitude, double longitude) {
 // ----------------------------------------------------------------------
 // update the lcd display with the two lines of text from SRAM
 // 
-void update_lcd(LiquidCrystal_I2C &lcd, char const *line1/* = "" */, char const *line2/* = "" */) {
+void update_lcd(LiquidCrystal &lcd, char const *line1/* = "" */, char const *line2/* = "" */) {
 #if defined(SERIAL_OUTPUT)
     Serial.print(F("\n"));
     Serial.println(line1);
@@ -162,7 +162,7 @@ void update_lcd(LiquidCrystal_I2C &lcd, char const *line1/* = "" */, char const 
 // ----------------------------------------------------------------------
 // update the lcd display with the two lines of text from PROGMEM flash memory
 // 
-void update_lcd_P(LiquidCrystal_I2C &lcd, char const *line1, char const *line2) {
+void update_lcd_P(LiquidCrystal &lcd, char const *line1, char const *line2) {
     char data1[32], data2[32];
     strncpy_P(data1, line1, sizeof(data1));
     strncpy_P(data2, line2, sizeof(data2));
@@ -174,7 +174,7 @@ void update_lcd_P(LiquidCrystal_I2C &lcd, char const *line1, char const *line2) 
 // ----------------------------------------------------------------------
 // turn the lcd display off
 // 
-void lcd_off(LiquidCrystal_I2C &lcd) {
+void lcd_off(LiquidCrystal &lcd) {
     lcd.noDisplay();
     smartDelay(200);
 
@@ -184,7 +184,7 @@ void lcd_off(LiquidCrystal_I2C &lcd) {
 // ----------------------------------------------------------------------
 // display the current latitude and longitude. for debugging/testing
 // 
-void update_local_display(LiquidCrystal_I2C &lcd) {
+void update_local_display(LiquidCrystal &lcd) {
     while (!gps.location.isValid()) {
         smartDelay(100);
         if (millis() >= 30000 && gps.charsProcessed() < 10) {
@@ -218,7 +218,7 @@ void update_local_display(LiquidCrystal_I2C &lcd) {
 // ----------------------------------------------------------------------
 // Handle arriving at our next target location!
 // 
-void target_success(LiquidCrystal_I2C &lcd) {
+void target_success(LiquidCrystal &lcd) {
     // We successfully reached the target!
     static const char line1[] PROGMEM = "Congratulations!";
 
@@ -247,7 +247,7 @@ void target_success(LiquidCrystal_I2C &lcd) {
 // remaining. Handles arriving at target(s), reducing the number of tries,
 // and possibly unlocking the box and play a song.
 // 
-void update_target_display(LiquidCrystal_I2C &lcd) {
+void update_target_display(LiquidCrystal &lcd) {
 
     // Use Clock Mode if all targets have been solved.
     if (config_data.get_num_targets() == 0) {
@@ -350,7 +350,7 @@ void update_target_display(LiquidCrystal_I2C &lcd) {
 // check for any special dates and times
 // and display a message for any
 // 
-void check_dates(LiquidCrystal_I2C &lcd) {
+void check_dates(LiquidCrystal &lcd) {
     while (!gps.date.isValid()) 
     {
         smartDelay();
@@ -382,7 +382,7 @@ void check_dates(LiquidCrystal_I2C &lcd) {
 // ----------------------------------------------------------------------
 // display the Vin voltage and processor temperature
 // 
-void show_temp_volt(LiquidCrystal_I2C &lcd) {
+void show_temp_volt(LiquidCrystal &lcd) {
     char line1[32], line2[32], buf[8];
 
     // calculate Vcc in millivolts:
@@ -418,7 +418,7 @@ void show_temp_volt(LiquidCrystal_I2C &lcd) {
 // show the current date and time
 // used in clock mode
 // 
-void show_datetime(LiquidCrystal_I2C &lcd) {
+void show_datetime(LiquidCrystal &lcd) {
     char line1[32], line2[32];
     static char const month[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
@@ -435,7 +435,7 @@ void show_datetime(LiquidCrystal_I2C &lcd) {
 // check for the secret backdoor to open the box
 // and access any special menus or features
 // 
-void check_secret(LiquidCrystal_I2C &lcd) {
+void check_secret(LiquidCrystal &lcd) {
     // set up one pin as an INPUT that defaults to HIGH. set up the other pin as an OUTPUT:
     pinMode(SecretPin1, INPUT_PULLUP);
     pinMode(SecretPin2, OUTPUT);
@@ -487,7 +487,7 @@ void check_secret(LiquidCrystal_I2C &lcd) {
 // see if the box needs locking and if so
 // display a countdown and then lock
 // 
-void check_developer_lock(LiquidCrystal_I2C &lcd) {
+void check_developer_lock(LiquidCrystal &lcd) {
 #if defined(DEVELOPER_MODE)
     static char const line1[] PROGMEM = "  Lock Stopped  ";
     static char const line2[] PROGMEM = " DEVELOPER_MODE ";
@@ -527,7 +527,7 @@ void check_developer_lock(LiquidCrystal_I2C &lcd) {
 // ----------------------------------------------------------------------
 // convert gps satellite time from gmt to some other time zone
 // 
-tm convert_cst(LiquidCrystal_I2C &lcd, int gmt_offset) {
+tm convert_cst(LiquidCrystal &lcd, int gmt_offset) {
     wait_for_gps(lcd);
     while (!gps.date.isValid() || !gps.time.isValid()) {
         smartDelay();
@@ -587,7 +587,7 @@ tm convert_cst(LiquidCrystal_I2C &lcd, int gmt_offset) {
 // ----------------------------------------------------------------------
 // test all of the features of the box
 // 
-void test_all(LiquidCrystal_I2C &lcd) {
+void test_all(LiquidCrystal &lcd) {
     if (!config_data.load()) {
         static const char line1[] PROGMEM = "EEPROM load fail";
         static const char line2[] PROGMEM = "";

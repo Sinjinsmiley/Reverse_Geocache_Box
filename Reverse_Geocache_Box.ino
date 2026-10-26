@@ -12,7 +12,7 @@
 |*| [+] Runs on 2 3.7V rechargeable lipo batteries
 |*| [+] 5V LDO (low drop-out) regulator circuit
 |*| [+] Uses solid state power button.  Turns itself off.  0.000A used when off.
-|*| [+] I2C LCD display
+|*| [+] 16x2 LCD display (4-bit parallel)
 |*| [+] 4800 baud serial GPS module
 |*| [+] Metal Gear Digital Servo controls the box lock mechanism
 |*| [+] Hidden easter egg to unlock or get into internal debugger/setup mode
@@ -62,7 +62,7 @@ eeprom_data_t    config_data;
 // unlock the box so the gift can be put inside, and show the distance
 // to the first target without using up a try. Never returns.
 //
-void program_box(LiquidCrystal_I2C &lcd)
+void program_box(LiquidCrystal &lcd)
 {
     // config_data has not been loaded from the EEPROM so it starts out
     // blank, and saving it replaces any old target(s) and date(s).
@@ -133,9 +133,8 @@ void setup()
 {
     init_serial();
 
-    LiquidCrystal_I2C lcd(I2C_Disp_Addr, 16, 2);
-    lcd.init();
-    lcd.backlight();
+    LiquidCrystal lcd(LcdRSPin, LcdEnPin, LcdD4Pin, LcdD5Pin, LcdD6Pin, LcdD7Pin);
+    lcd.begin(16, 2);
 
     init_gps();
 
