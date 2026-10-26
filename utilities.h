@@ -24,7 +24,6 @@
 
 #include "eeprom_data.h"
 #include "utilities.h"
-#include "datetime.h"
 #include "menu.h"
 
 // ======================================================================
@@ -45,7 +44,7 @@
 // subsystems in the project for testing and debugging.
 
 // PROGRAM_EEPROM
-// This writes the target(s), special date(s), and number of tries
+// This writes the target(s) and number of tries
 // set in program_box() (Reverse_Geocache_Box.ino) to the EEPROM,
 // unlocks the box, and then halts. Upload with this enabled, power
 // the box on once, then disable it and upload again.
@@ -61,7 +60,7 @@
 // uncomment to enable SELF_TEST mode
 //#define SELF_TEST
 
-// uncomment to program the EEPROM with new target(s) and date(s)
+// uncomment to program the EEPROM with new target(s)
 //#define PROGRAM_EEPROM
 
 // external global variables
@@ -120,7 +119,6 @@ void update_lcd_P(LiquidCrystal &lcd, char const *line1, char const *line2);
 void lcd_off(LiquidCrystal &lcd);
 void update_local_display(LiquidCrystal &lcd);
 void update_target_display(LiquidCrystal &lcd);
-void check_dates(LiquidCrystal &lcd);
 void show_temp_volt(LiquidCrystal &lcd);
 void show_datetime(LiquidCrystal &lcd);
 void check_secret(LiquidCrystal &lcd);

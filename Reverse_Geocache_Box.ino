@@ -16,11 +16,9 @@
 |*| [+] 4800 baud serial GPS module
 |*| [+] Metal Gear Digital Servo controls the box lock mechanism
 |*| [+] Hidden easter egg to unlock or get into internal debugger/setup mode
-|*| [+] Displays messages on important dates.
-|*| [+] Up to 8 special dates/times with messages can be stored!
 |*| [+] Up to 8 sequential targets can be configured!
-|*| [+] All configurable target(s), important date(s) and messages, and
-|*|     remaining tries are stored in EEPROM.
+|*| [+] All configurable target(s) and remaining tries are stored
+|*|     in EEPROM.
 |*| [+] Detects if EEPROM has never been programmed and automatically
 |*|     updates it the first time if needed.
 |*| [+] Only modified values are updated in EEPROM - saves write cycles
@@ -32,7 +30,6 @@
 |*| TODO:
 |*| [ ] give the user a direction heading
 |*| [ ] menu for user-configurable target(s)
-|*| [ ] menu for user-configurable important date(s) and messages
 |*| [ ] alarms during clock mode
 |*| 
 \*/
@@ -58,22 +55,18 @@ eeprom_data_t    config_data;
 #warning compiling for PROGRAM_EEPROM.
 
 // ----------------------------------------------------------------------
-// write new target(s), date(s), and number of tries to the EEPROM,
+// write new target(s) and number of tries to the EEPROM,
 // unlock the box so the gift can be put inside, and show the distance
 // to the first target without using up a try. Never returns.
 //
 void program_box(LiquidCrystal &lcd)
 {
     // config_data has not been loaded from the EEPROM so it starts out
-    // blank, and saving it replaces any old target(s) and date(s).
+    // blank, and saving it replaces any old target(s).
 
     // set the number of tries before init() copies it into the remaining tries
     config_data.set_default_tries(DefaultTries);
     config_data.init();
-
-    // Set any special date(s), up to MAX_DATES. Date and time are gmt.
-    datetime_t alert = datetime_t(2022, 12, 29, 20, 30, 0);
-    config_data.add_alert(alert, "Alert", "One");
 
     // Set at least one target, up to MAX_TARGETS. Targets must be
     // reached in order: 0, 1, 2, ...
@@ -140,7 +133,7 @@ void setup()
 
     // ------------------------------------------------------------
     // enable PROGRAM_EEPROM in utilities.h and run once to update the
-    // EEPROM with the target(s), date(s), and number of tries that
+    // EEPROM with the target(s) and number of tries that
     // are set in program_box() above
 #if defined(PROGRAM_EEPROM)
     program_box(lcd);
@@ -173,10 +166,6 @@ void setup()
     // ------------------------------------------------------------
     // wait until we get a valid satellite lock:
     wait_for_gps(lcd);
-
-    // ------------------------------------------------------------
-    // check for special dates
-    check_dates(lcd);
 
     // ------------------------------------------------------------
     // update the display with the target distance

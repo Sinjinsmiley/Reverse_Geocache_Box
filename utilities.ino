@@ -347,39 +347,6 @@ void update_target_display(LiquidCrystal &lcd) {
 
 
 // ----------------------------------------------------------------------
-// check for any special dates and times
-// and display a message for any
-// 
-void check_dates(LiquidCrystal &lcd) {
-    while (!gps.date.isValid()) 
-    {
-        smartDelay();
-    }
-
-    int num = config_data.get_num_alerts();
-    for (int i=0; i < num; i++) {
-        datetime_t dt;
-        char msg[2][17];
-        if (config_data.get_alert(i, dt, msg[0], msg[1])) {
-            if ( dt.get_year() == gps.date.year()
-              && dt.get_month() == gps.date.month()
-              && dt.get_day() == gps.date.day()
-
-            // include time in check if desired:
-              //&& dt.get_hours() == gps.time.hour()
-              //&& dt.get_minutes() == gps.time.minute()
-              //&& dt.get_seconds() == gps.time.second()
-            ) {
-                update_lcd(lcd, msg[0], msg[1]);
-                smartDelay(DisplayTime * 1000);
-            }
-        }
-    }
-
-} // check_dates
-
-
-// ----------------------------------------------------------------------
 // display the Vin voltage and processor temperature
 // 
 void show_temp_volt(LiquidCrystal &lcd) {
@@ -601,8 +568,6 @@ void test_all(LiquidCrystal &lcd) {
 
     update_local_display(lcd);
     smartDelay(DisplayTime * 1000);
-
-    check_dates(lcd);
 
     show_datetime(lcd);
     smartDelay(2000);

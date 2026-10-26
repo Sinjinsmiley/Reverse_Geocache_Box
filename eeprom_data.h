@@ -10,13 +10,9 @@
 #define EEPROM_DATA
 
 #include <EEPROM.h>
-#include "datetime.h"
 
 // Redefine as needed (and memory allows)
 #define   MAX_TARGETS    8
-
-// Redefine as needed (and memory allows)
-#define   MAX_DATES      8
 
 // The persistent values in EEPROM
 class eeprom_data_t 
@@ -35,11 +31,6 @@ private:
         double      lat {0.0};
         double      lon {0.0};
     } targets[MAX_TARGETS];
-
-    struct alert_t {
-        datetime_t dt;
-        char msg[2][17] { "                ", "                " };
-    } dates[MAX_DATES];
 
 public:
 
@@ -177,60 +168,6 @@ public:
         }
 
         return 0;
-    }
-
-    // ----------------------------------------------------------------------
-    // Alerts for special dates/times:
-
-    int get_num_alerts() const
-    {
-        unsigned num = 0;
-        for (; num < ARRAYSZ(dates); num++)
-        {
-            if (dates[num].dt.get_year() == 0)
-                break;
-        }
-
-        return num;
-    }
-
-    bool get_alert(unsigned i, datetime_t &dt, char msg1[], char msg2[]) const
-    {
-        if (i < ARRAYSZ(dates))
-        {
-            dt = dates[i].dt;
-            strcpy(msg1, dates[i].msg[0]);
-            strcpy(msg2, dates[i].msg[1]);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    bool add_alert(datetime_t const &dt, char const *msg1, char const *msg2)
-    {
-        unsigned num = get_num_alerts();
-        for (unsigned i = 0; i < num; ++i) {
-            alert_t &alert = dates[i];
-            if (alert.dt == dt && !strcmp(alert.msg[0], msg1) && !strcmp(alert.msg[1], msg2)) {
-                return true;
-            }
-        }
-
-        if (num >= ARRAYSZ(dates)) {
-            return  false;
-        }
-
-        alert_t &alert = dates[num];
-
-        alert.dt = dt;
-        strcpy(alert.msg[0], msg1);
-        strcpy(alert.msg[1], msg2);
-
-        dirty = true;
-
-        return true;
     }
 
     // ----------------------------------------------------------------------
